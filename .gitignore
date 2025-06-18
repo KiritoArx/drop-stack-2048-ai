@@ -132,6 +132,7 @@ celerybeat.pid
 .venv
 env/
 venv/
+!drop_stack_ai/env/
 ENV/
 env.bak/
 venv.bak/
