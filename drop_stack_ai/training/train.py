@@ -64,6 +64,7 @@ class TrainConfig:
     steps: int = 1000
     learning_rate: float = 1e-3
     hidden_size: int = 128
+    log_interval: int = 10
 
 
 def create_train_state(rng: jax.random.PRNGKey, config: TrainConfig) -> train_state.TrainState:
@@ -147,9 +148,9 @@ def train(buffer: ReplayBuffer, *, seed: int = 0, config: TrainConfig | None = N
             batch = {k: v.reshape((n_devices, per_dev) + v.shape[1:]) for k, v in batch.items()}
         state, metrics = update_fn(state, batch)
 
-        if step % 10 == 0:
+        if step == 1 or step == config.steps or step % config.log_interval == 0:
             # Metrics may be replicated
-            metrics = jax.tree_map(lambda x: float(jnp.mean(x)), metrics)
+            metrics = jax.tree_util.tree_map(lambda x: float(jnp.mean(x)), metrics)
             print(
                 f"step {step}: loss={metrics['loss']:.4f} "
                 f"policy_loss={metrics['policy_loss']:.4f} value_loss={metrics['value_loss']:.4f}"
