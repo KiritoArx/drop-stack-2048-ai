@@ -120,6 +120,14 @@ def train(buffer: ReplayBuffer, *, seed: int = 0, config: TrainConfig | None = N
     n_devices = len(devices)
     print(f"Using {n_devices} device(s) for training")
 
+    if config.batch_size < n_devices or config.batch_size % n_devices != 0:
+        print(
+            "Warning: batch size does not align with available devices; "
+            "falling back to single-device mode"
+        )
+        devices = [devices[0]]
+        n_devices = 1
+
     if n_devices > 1:
         state = jax.device_put_replicated(state, devices)
         update_fn = pmap_update_fn(model)
