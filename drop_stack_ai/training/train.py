@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict
 
+import os
+os.environ.setdefault("JAX_TRACEBACK_FILTERING", "off")
+
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
