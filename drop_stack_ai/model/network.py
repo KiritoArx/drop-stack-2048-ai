@@ -18,17 +18,25 @@ class DropStackNet(nn.Module):
         """Forward pass.
 
         Args:
-            board: array of shape (5, 6) with tile values.
-            current_tile: scalar array with the current tile value.
-            next_tile: scalar array with the next tile value.
+            board: array of shape ``(5, 6)`` or ``(batch, 5, 6)`` with tile values.
+            current_tile: scalar array (or ``(batch,)``) with the current tile value.
+            next_tile: scalar array (or ``(batch,)``) with the next tile value.
 
         Returns:
             Tuple of ``(policy_logits, value)``.
         """
         # Flatten the board and take log2 encoding to keep values in a reasonable range.
-        board_flat = jnp.log2(jnp.maximum(board, 1)).reshape(-1)
-        tile_feats = jnp.log2(jnp.maximum(jnp.stack([current_tile, next_tile]), 1))
-        x = jnp.concatenate([board_flat, tile_feats], axis=0)
+        if board.ndim == 3:
+            # Batched input
+            board_flat = jnp.log2(jnp.maximum(board, 1)).reshape(board.shape[0], -1)
+            tile_feats = jnp.log2(
+                jnp.maximum(jnp.stack([current_tile, next_tile], axis=1), 1)
+            )
+            x = jnp.concatenate([board_flat, tile_feats], axis=1)
+        else:
+            board_flat = jnp.log2(jnp.maximum(board, 1)).reshape(-1)
+            tile_feats = jnp.log2(jnp.maximum(jnp.stack([current_tile, next_tile]), 1))
+            x = jnp.concatenate([board_flat, tile_feats], axis=0)
 
         x = nn.Dense(self.hidden_size)(x)
         x = nn.relu(x)
