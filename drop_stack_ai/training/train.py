@@ -9,7 +9,7 @@ from flax import linen as nn
 from flax.training import train_state
 import optax
 
-from ..model.network import DropStackNet, create_model
+from drop_stack_ai.model.network import DropStackNet, create_model
 from .replay_buffer import ReplayBuffer
 
 

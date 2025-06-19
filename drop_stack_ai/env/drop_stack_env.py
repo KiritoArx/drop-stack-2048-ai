@@ -111,10 +111,13 @@ class DropStackEnv:
         self.next_tile = self._spawn_tile()
         return self.get_state()
 
-    def step(self, action_col: int) -> Dict[str, object]:
-        """Drop the current tile into ``action_col``."""
+    def step(self, action_col: int) -> tuple[Dict[str, object], int, bool]:
+        """Drop the current tile into ``action_col``.
+
+        Returns a tuple of ``(next_state, reward, done)``.
+        """
         if self.done:
-            return self.get_state()
+            return self.get_state(), 0, True
 
         if action_col < 0 or action_col >= self.COLUMN_COUNT:
             raise ValueError("Invalid column")
@@ -137,7 +140,8 @@ class DropStackEnv:
         # Check for game over
         self.done = game_over(self.board, self.MAX_HEIGHT)
 
-        return self.get_state() | {"reward": reward}
+        next_state = self.get_state()
+        return next_state, reward, self.done
 
     def render(self) -> None:
         """Print the current board."""
