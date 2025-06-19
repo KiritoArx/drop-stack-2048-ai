@@ -157,4 +157,5 @@ if __name__ == "__main__":
     }
     dummy_policy = jnp.ones(5, dtype=jnp.float32) / 5
     buffer.add_episode([env_state], [dummy_policy], [0.0])
-    train(buffer, steps=5)
+    config = TrainConfig(batch_size=1, steps=5)
+    train(buffer, config=config)
