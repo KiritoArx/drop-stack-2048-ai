@@ -5,9 +5,9 @@ from typing import List, Dict, Any
 import jax
 import jax.numpy as jnp
 
-from ..env.drop_stack_env import DropStackEnv
-from ..model.network import DropStackNet
-from ..training.replay_buffer import ReplayBuffer
+from drop_stack_ai.env.drop_stack_env import DropStackEnv
+from drop_stack_ai.model.network import DropStackNet
+from drop_stack_ai.training.replay_buffer import ReplayBuffer
 
 
 def _state_to_arrays(state: Dict[str, Any]) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
@@ -52,8 +52,7 @@ def self_play(
         policies.append(policy)
         values.append(0.0)  # placeholder
 
-        env.step(action)
-        done = env.done
+        _, _, done = env.step(action)
 
     # Episode finished, assign final score as the value target
     final_score = env.score
