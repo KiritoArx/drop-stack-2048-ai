@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Tuple
 
 import jax
@@ -23,7 +22,10 @@ class DropStackNet(nn.Module):
             next_tile: scalar array (or ``(batch,)``) with the next tile value.
 
         Returns:
-            Tuple of ``(policy_logits, value)``.
+            Tuple of ``(policy_logits, value)`` where ``policy_logits`` are the
+            unnormalised action preferences and ``value`` is a scalar evaluation
+            of the position. These outputs are consumed directly by the MCTS
+            implementation.
         """
         # Flatten the board and take log2 encoding to keep values in a reasonable range.
         if board.ndim == 3:
@@ -43,6 +45,8 @@ class DropStackNet(nn.Module):
         x = nn.Dense(self.hidden_size)(x)
         x = nn.relu(x)
 
+        # Two separate heads: policy provides logits for MCTS priors, value
+        # produces a scalar evaluation of the current position.
         policy_logits = nn.Dense(5)(x)
         value = nn.Dense(1)(x)
         value = value.squeeze(axis=-1)
