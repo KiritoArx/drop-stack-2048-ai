@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import List, Dict, Any
 
+import math
+
 import jax
 import jax.numpy as jnp
 
@@ -55,7 +57,7 @@ def self_play(
         _, _, done = env.step(action)
 
     # Episode finished, assign final score as the value target
-    final_score = env.score
+    final_score = math.log(env.score + 1)
     values = [float(final_score)] * len(values)
     buffer.add_episode(states, policies, values)
     return rng
