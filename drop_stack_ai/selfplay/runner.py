@@ -13,17 +13,6 @@ from drop_stack_ai.model.mcts import run_mcts
 from drop_stack_ai.training.replay_buffer import ReplayBuffer
 
 
-def _state_to_arrays(state: Dict[str, Any]) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Convert a raw env state dict into arrays usable by the model."""
-    board = jnp.zeros((5, 6), dtype=jnp.float32)
-    for c, col in enumerate(state["board"]):
-        if col:
-            board = board.at[c, : len(col)].set(jnp.array(col, dtype=jnp.float32))
-    current = jnp.array(state["current_tile"], dtype=jnp.float32)
-    next_tile = jnp.array(state["next_tile"], dtype=jnp.float32)
-    return board, current, next_tile
-
-
 def self_play(
     model: DropStackNet,
     params: Dict[str, Any],
