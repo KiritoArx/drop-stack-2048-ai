@@ -45,7 +45,14 @@ def _prepare_batch(samples: list[Dict[str, Any]]) -> Dict[str, jnp.ndarray]:
         boards.append(b)
         currents.append(c)
         nexts.append(n)
-        policies.append(jnp.array(item["policy"], dtype=jnp.float32))
+        policy = jnp.array(item["policy"], dtype=jnp.float32)
+        if policy.ndim == 1 and policy.sum() != 0:
+            # Ensure policy represents a probability distribution. The
+            # replay buffer may store raw visit counts from MCTS.
+            policy = policy / policy.sum()
+        policies.append(policy)
+
+        # ``value`` stores ``log(final_score + 1)`` for the episode.
         values.append(jnp.array(item["value"], dtype=jnp.float32))
     batch = {
         "board": jnp.stack(boards),
@@ -95,7 +102,9 @@ def create_train_state(rng: jax.random.PRNGKey, config: TrainConfig) -> train_st
 def make_update_fn(model: DropStackNet):
     def loss_fn(params, batch):
         logits, value_pred = model.apply(params, batch["board"], batch["current"], batch["next"])
+        # ``batch['policy']`` contains the MCTS visit probability distribution.
         policy_loss = optax.softmax_cross_entropy(logits, batch["policy"]).mean()
+        # Values are stored as ``log(final_score + 1)`` for each step.
         value_loss = jnp.mean((value_pred - batch["value"]) ** 2)
         loss = policy_loss + value_loss
         return loss, (policy_loss, value_loss)
