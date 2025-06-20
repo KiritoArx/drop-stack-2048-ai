@@ -9,6 +9,7 @@ import jax.numpy as jnp
 
 from drop_stack_ai.env.drop_stack_env import DropStackEnv
 from drop_stack_ai.model.network import DropStackNet
+from drop_stack_ai.model.mcts import run_mcts
 from drop_stack_ai.training.replay_buffer import ReplayBuffer
 
 
@@ -30,6 +31,8 @@ def self_play(
     buffer: ReplayBuffer,
     *,
     greedy: bool = False,
+    simulations: int = 50,
+    c_puct: float = 1.0,
 ) -> jax.random.PRNGKey:
     """Play one episode and store the experience in ``buffer``."""
     env = DropStackEnv()
@@ -40,9 +43,13 @@ def self_play(
     done = False
     while not done:
         raw_state = env.get_state()
-        board, current, next_tile = _state_to_arrays(raw_state)
-        logits, value_pred = model.apply(params, board, current, next_tile)
-        policy = jax.nn.softmax(logits)
+        policy = run_mcts(
+            model,
+            params,
+            env,
+            num_simulations=simulations,
+            c_puct=c_puct,
+        )
 
         if greedy:
             action = int(jnp.argmax(policy))
