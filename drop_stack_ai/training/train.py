@@ -4,15 +4,18 @@ from dataclasses import dataclass
 from typing import Any, Dict
 
 import os
+import argparse
+import pickle
+
 os.environ.setdefault("JAX_TRACEBACK_FILTERING", "off")
 
 import jax
 import jax.numpy as jnp
-from flax import linen as nn
 from flax.training import train_state
 import optax
 
 from drop_stack_ai.model.network import DropStackNet, create_model
+from drop_stack_ai.selfplay.runner import self_play
 from .replay_buffer import ReplayBuffer
 
 
@@ -52,6 +55,18 @@ def _prepare_batch(samples: list[Dict[str, Any]]) -> Dict[str, jnp.ndarray]:
         "value": jnp.stack(values),
     }
     return batch
+
+
+def load_buffer(path: str) -> ReplayBuffer:
+    """Load a ``ReplayBuffer`` from ``path``."""
+    with open(path, "rb") as f:
+        data = pickle.load(f)
+
+    if isinstance(data, ReplayBuffer):
+        return data
+    if isinstance(data, list):
+        return ReplayBuffer(data=data)
+    raise TypeError("Unrecognized buffer format")
 
 
 # -----------------------------------------------------------------------------
@@ -158,16 +173,34 @@ def train(buffer: ReplayBuffer, *, seed: int = 0, config: TrainConfig | None = N
 
 
 if __name__ == "__main__":
-    buffer = ReplayBuffer()
-    # minimal dummy data to allow script to run
-    env_state = {
-        "board": [[] for _ in range(5)],
-        "current_tile": 2,
-        "next_tile": 2,
-        "score": 0,
-        "done": False,
-    }
-    dummy_policy = jnp.ones(5, dtype=jnp.float32) / 5
-    buffer.add_episode([env_state], [dummy_policy], [0.0])
-    config = TrainConfig(batch_size=1, steps=5)
-    train(buffer, config=config)
+    parser = argparse.ArgumentParser(description="Train Drop Stack 2048 model")
+    parser.add_argument("--buffer", type=str, help="Path to replay buffer pickle")
+    parser.add_argument("--self-play", type=int, default=0, help="Generate this many self-play episodes before training")
+    parser.add_argument("--steps", type=int, default=1000, help="Number of training steps")
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
+    parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument("--hidden-size", type=int, default=128, help="Model hidden size")
+    parser.add_argument("--seed", type=int, default=0, help="PRNG seed")
+    args = parser.parse_args()
+
+    if args.buffer:
+        buffer = load_buffer(args.buffer)
+    else:
+        buffer = ReplayBuffer()
+
+    rng = jax.random.PRNGKey(args.seed)
+    if args.self_play > 0:
+        model, params = create_model(rng, hidden_size=args.hidden_size)
+        for _ in range(args.self_play):
+            rng = self_play(model, params, rng, buffer)
+
+    if len(buffer) == 0:
+        raise ValueError("Replay buffer is empty")
+
+    config = TrainConfig(
+        batch_size=args.batch_size,
+        steps=args.steps,
+        learning_rate=args.learning_rate,
+        hidden_size=args.hidden_size,
+    )
+    train(buffer, seed=args.seed, config=config)
