@@ -15,7 +15,7 @@ from flax.training import train_state
 import optax
 
 from drop_stack_ai.model.network import DropStackNet, create_model
-from drop_stack_ai.selfplay.runner import self_play
+from drop_stack_ai.selfplay.self_play import self_play
 from .replay_buffer import ReplayBuffer
 
 
