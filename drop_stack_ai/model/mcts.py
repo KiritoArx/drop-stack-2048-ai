@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict
 import math
-from copy import deepcopy
 
 import jax
 import jax.numpy as jnp
@@ -12,7 +11,9 @@ from drop_stack_ai.env.drop_stack_env import DropStackEnv
 from .network import DropStackNet
 
 
-def _state_to_arrays(state: Dict[str, object]) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+def _state_to_arrays(
+    state: Dict[str, object],
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Convert env state dict into arrays for the model."""
     board = jnp.zeros((5, 6), dtype=jnp.float32)
     for c, col in enumerate(state["board"]):
@@ -65,7 +66,7 @@ def run_mcts(
     root = Node(prior=1.0)
 
     for _ in range(num_simulations):
-        sim_env = deepcopy(env)
+        sim_env = env.clone()
         node = root
         path: list[tuple[Node, int]] = []
 
@@ -96,7 +97,10 @@ def run_mcts(
             child.visit_count += 1
             child.value_sum += value
 
-    counts = jnp.array([root.children[a].visit_count if a in root.children else 0 for a in range(5)], dtype=jnp.float32)
+    counts = jnp.array(
+        [root.children[a].visit_count if a in root.children else 0 for a in range(5)],
+        dtype=jnp.float32,
+    )
     if counts.sum() > 0:
         policy = counts / counts.sum()
     else:

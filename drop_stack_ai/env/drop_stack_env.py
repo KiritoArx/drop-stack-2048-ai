@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import random
 from collections import deque
-from copy import deepcopy
 from typing import Dict, List
 
 from .merge import drop_and_resolve, print_board, game_over, Board
@@ -111,6 +110,19 @@ class DropStackEnv:
         self.next_tile = self._spawn_tile()
         return self.get_state()
 
+    def clone(self) -> "DropStackEnv":
+        """Return a copy of the environment without using ``deepcopy``."""
+        clone = DropStackEnv.__new__(DropStackEnv)
+        clone.random = random.Random()
+        clone.random.setstate(self.random.getstate())
+        clone.board = [c.copy() for c in self.board]
+        clone.score = self.score
+        clone.max_tile = self.max_tile
+        clone.current_tile = self.current_tile
+        clone.next_tile = self.next_tile
+        clone.done = self.done
+        return clone
+
     def step(self, action_col: int) -> tuple[Dict[str, object], int, bool]:
         """Drop the current tile into ``action_col``.
 
@@ -122,7 +134,7 @@ class DropStackEnv:
         if action_col < 0 or action_col >= self.COLUMN_COUNT:
             raise ValueError("Invalid column")
 
-        sim_board = deepcopy(self.board)
+        sim_board = [c.copy() for c in self.board]
         reward = self._drop_resolve_and_score(sim_board, self.current_tile, action_col)
         self.score += reward
 
@@ -131,7 +143,10 @@ class DropStackEnv:
 
         # Update max tile
         if self.board:
-            self.max_tile = max(self.max_tile, max((max(col) for col in self.board if col), default=self.max_tile))
+            self.max_tile = max(
+                self.max_tile,
+                max((max(col) for col in self.board if col), default=self.max_tile),
+            )
 
         # Advance tiles
         self.current_tile = self.next_tile
@@ -146,15 +161,16 @@ class DropStackEnv:
     def render(self) -> None:
         """Print the current board."""
         print_board(self.board, self.MAX_HEIGHT)
-        print(f"Score: {self.score}\nCurrent: {self.current_tile}  Next: {self.next_tile}\n")
+        print(
+            f"Score: {self.score}\nCurrent: {self.current_tile}  Next: {self.next_tile}\n"
+        )
 
     def get_state(self) -> Dict[str, object]:
         """Return the current state of the game."""
         return {
-            "board": deepcopy(self.board),
+            "board": [c.copy() for c in self.board],
             "current_tile": self.current_tile,
             "next_tile": self.next_tile,
             "score": self.score,
             "done": self.done,
         }
-
