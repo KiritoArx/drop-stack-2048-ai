@@ -16,6 +16,8 @@ import jax.numpy as jnp
 from flax.training import train_state
 import optax
 
+from drop_stack_ai.utils.device_info import print_device_info
+
 from drop_stack_ai.model.network import DropStackNet, create_model
 from drop_stack_ai.selfplay.self_play import (
     self_play,
@@ -161,6 +163,7 @@ def train(
         config = TrainConfig()
 
     rng = jax.random.PRNGKey(seed)
+    print_device_info()
     sp_rng, rng = jax.random.split(rng)
     state, model = create_train_state(rng, config)
 

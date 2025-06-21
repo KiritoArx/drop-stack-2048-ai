@@ -3,6 +3,8 @@ import argparse
 
 import jax
 
+from drop_stack_ai.utils.device_info import print_device_info
+
 from drop_stack_ai.model.network import create_model
 from drop_stack_ai.selfplay.self_play import self_play, self_play_parallel
 from drop_stack_ai.training.replay_buffer import ReplayBuffer
@@ -104,6 +106,8 @@ def main() -> None:
     args = parser.parse_args()
 
     os.environ.setdefault("JAX_TRACEBACK_FILTERING", "off")
+
+    print_device_info()
 
     config = TrainConfig(
         batch_size=args.batch_size,
