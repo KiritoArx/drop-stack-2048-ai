@@ -11,7 +11,7 @@ from drop_stack_ai.utils.serialization import load_params
 from drop_stack_ai.selfplay.evaluate import evaluate_model
 
 
-def run_cycle(episodes: int, seed: int, config: TrainConfig) -> None:
+def run_cycle(episodes: int, seed: int, config: TrainConfig, *, greedy_after: int | None = None) -> None:
     """Run self-play to populate a buffer then train a model."""
     print(
         f"[run_cycle] starting: episodes={episodes} seed={seed} hidden_size={config.hidden_size}"
@@ -24,7 +24,7 @@ def run_cycle(episodes: int, seed: int, config: TrainConfig) -> None:
     buffer = ReplayBuffer()
     for i in range(episodes):
         print(f"[run_cycle] self-play episode {i + 1}/{episodes}")
-        rng = self_play(model, params, rng, buffer)
+        rng = self_play(model, params, rng, buffer, greedy_after=greedy_after)
         print(f"[run_cycle] buffer size={len(buffer)} after episode {i + 1}")
     if len(buffer) == 0:
         raise ValueError("Replay buffer is empty after self-play")
@@ -68,6 +68,12 @@ def main() -> None:
     )
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
     parser.add_argument("--cycles", type=int, default=1, help="Number of training cycles to run")
+    parser.add_argument(
+        "--greedy-after",
+        type=int,
+        default=10,
+        help="Number of moves to sample probabilistically before switching to greedy play",
+    )
     args = parser.parse_args()
 
     os.environ.setdefault("JAX_TRACEBACK_FILTERING", "off")
@@ -81,7 +87,7 @@ def main() -> None:
     )
     for cycle in range(args.cycles):
         print(f"[main] starting cycle {cycle + 1}/{args.cycles}")
-        run_cycle(args.episodes, args.seed + cycle, config)
+        run_cycle(args.episodes, args.seed + cycle, config, greedy_after=args.greedy_after)
 
 
 if __name__ == "__main__":

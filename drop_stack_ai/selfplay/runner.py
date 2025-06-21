@@ -20,15 +20,22 @@ def self_play(
     buffer: ReplayBuffer,
     *,
     greedy: bool = False,
+    greedy_after: int | None = None,
     simulations: int = 50,
     c_puct: float = 1.0,
 ) -> jax.random.PRNGKey:
-    """Play one episode and store the experience in ``buffer``."""
+    """Play one episode and store the experience in ``buffer``.
+
+    The first ``greedy_after`` moves are sampled from the MCTS policy
+    distribution; subsequent moves take the greedy action. If ``greedy`` is
+    ``True`` the episode is played greedily from the start.
+    """
     env = DropStackEnv()
     states: List[Dict[str, Any]] = []
     policies: List[jnp.ndarray] = []
     values: List[float] = []
 
+    step = 0
     done = False
     while not done:
         raw_state = env.get_state()
@@ -40,7 +47,8 @@ def self_play(
             c_puct=c_puct,
         )
 
-        if greedy:
+        use_greedy = greedy or (greedy_after is not None and step >= greedy_after)
+        if use_greedy:
             action = int(jnp.argmax(policy))
         else:
             rng, key = jax.random.split(rng)
@@ -51,6 +59,7 @@ def self_play(
         values.append(0.0)  # placeholder
 
         _, _, done = env.step(action)
+        step += 1
 
     # Episode finished, assign final score as the value target
     final_score = math.log(env.score + 1)
