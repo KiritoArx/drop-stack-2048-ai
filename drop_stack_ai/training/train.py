@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import os
 import argparse
@@ -17,6 +17,7 @@ import optax
 from drop_stack_ai.model.network import DropStackNet, create_model
 from drop_stack_ai.selfplay.self_play import self_play
 from .replay_buffer import ReplayBuffer
+from drop_stack_ai.utils.serialization import load_params, save_params
 
 
 # -----------------------------------------------------------------------------
@@ -87,10 +88,14 @@ class TrainConfig:
     learning_rate: float = 1e-3
     hidden_size: int = 128
     log_interval: int = 10
+    checkpoint_path: Optional[str] = None
 
 
 def create_train_state(rng: jax.random.PRNGKey, config: TrainConfig) -> train_state.TrainState:
     model, params = create_model(rng, hidden_size=config.hidden_size)
+    if config.checkpoint_path and os.path.exists(config.checkpoint_path):
+        print(f"Loading checkpoint from {config.checkpoint_path}")
+        params = load_params(config.checkpoint_path, params)
     tx = optax.adam(config.learning_rate)
     return train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx), model
 
@@ -180,6 +185,15 @@ def train(buffer: ReplayBuffer, *, seed: int = 0, config: TrainConfig | None = N
                 f"policy_loss={metrics['policy_loss']:.4f} value_loss={metrics['value_loss']:.4f}"
             )
 
+    # Save checkpoint when training completes
+    if config.checkpoint_path:
+        params = state.params
+        if n_devices > 1:
+            params = jax.tree_util.tree_map(lambda x: x[0], params)
+        params = jax.device_get(params)
+        save_params(params, config.checkpoint_path)
+        print(f"Saved checkpoint to {config.checkpoint_path}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Drop Stack 2048 model")
@@ -189,6 +203,12 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
     parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--hidden-size", type=int, default=128, help="Model hidden size")
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=os.path.join("checkpoints", "model.msgpack"),
+        help="Path to save or load model parameters",
+    )
     parser.add_argument("--seed", type=int, default=0, help="PRNG seed")
     args = parser.parse_args()
 
@@ -211,5 +231,6 @@ if __name__ == "__main__":
         steps=args.steps,
         learning_rate=args.learning_rate,
         hidden_size=args.hidden_size,
+        checkpoint_path=args.checkpoint,
     )
     train(buffer, seed=args.seed, config=config)
