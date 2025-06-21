@@ -11,14 +11,21 @@ from drop_stack_ai.training.train import TrainConfig, train
 
 def run_cycle(episodes: int, seed: int, config: TrainConfig) -> None:
     """Run self-play to populate a buffer then train a model."""
+    print(
+        f"[run_cycle] starting: episodes={episodes} seed={seed} hidden_size={config.hidden_size}"
+    )
     rng = jax.random.PRNGKey(seed)
     model, params = create_model(rng, hidden_size=config.hidden_size)
     buffer = ReplayBuffer()
-    for _ in range(episodes):
+    for i in range(episodes):
+        print(f"[run_cycle] self-play episode {i + 1}/{episodes}")
         rng = self_play(model, params, rng, buffer)
+        print(f"[run_cycle] buffer size={len(buffer)} after episode {i + 1}")
     if len(buffer) == 0:
         raise ValueError("Replay buffer is empty after self-play")
+    print("[run_cycle] starting training")
     train(buffer, seed=seed, config=config)
+    print("[run_cycle] training complete")
 
 
 def main() -> None:
