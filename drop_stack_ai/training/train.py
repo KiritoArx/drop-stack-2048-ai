@@ -6,7 +6,6 @@ from typing import Any, Dict, Optional
 import os
 import argparse
 import pickle
-import threading
 import time
 
 os.environ.setdefault("JAX_TRACEBACK_FILTERING", "off")

@@ -7,7 +7,6 @@ from collections import deque
 from typing import Dict, List
 
 from .merge import (
-    drop_and_resolve,
     drop_resolve_and_score,
     print_board,
     game_over,

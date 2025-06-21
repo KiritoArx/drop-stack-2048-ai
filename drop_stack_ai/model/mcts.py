@@ -6,7 +6,6 @@ import math
 
 import jax
 import jax.numpy as jnp
-import functools
 
 from drop_stack_ai.env.drop_stack_env import DropStackEnv
 from .network import DropStackNet
