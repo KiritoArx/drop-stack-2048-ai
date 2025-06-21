@@ -6,6 +6,7 @@ import math
 
 import jax
 import jax.numpy as jnp
+import functools
 
 from drop_stack_ai.env.drop_stack_env import DropStackEnv
 from .network import DropStackNet
@@ -53,6 +54,9 @@ def run_mcts(
     """Run MCTS starting from ``env`` state and return a policy distribution."""
     root = Node(prior=1.0)
 
+    # JIT compile the network forward pass for better MCTS performance
+    predict = jax.jit(model.apply)
+
     for _ in range(num_simulations):
         sim_env = env.clone()
         node = root
@@ -72,7 +76,7 @@ def run_mcts(
             value = math.log(sim_env.score + 1)
         else:
             board, current, next_tile = state_to_arrays(sim_env.get_state())
-            logits, value_pred = model.apply(params, board, current, next_tile)
+            logits, value_pred = predict(params, board, current, next_tile)
             policy = jax.nn.softmax(logits)
             if not node.children:
                 for a in range(5):
