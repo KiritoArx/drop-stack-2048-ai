@@ -145,7 +145,8 @@ def self_play_parallel(
         for seed in seeds
     ]
 
-    with mp.Pool(processes) as pool:
+    ctx = mp.get_context("spawn")
+    with ctx.Pool(processes) as pool:
         results = pool.map(_worker, args)
 
     for states, policies, values in results:
