@@ -35,6 +35,12 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
     parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--hidden-size", type=int, default=128, help="Model hidden size")
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=os.path.join("checkpoints", "model.msgpack"),
+        help="Path to save or load model parameters",
+    )
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
     args = parser.parse_args()
 
@@ -45,6 +51,7 @@ def main() -> None:
         steps=args.steps,
         learning_rate=args.learning_rate,
         hidden_size=args.hidden_size,
+        checkpoint_path=args.checkpoint,
     )
     run_cycle(args.episodes, args.seed, config)
 
