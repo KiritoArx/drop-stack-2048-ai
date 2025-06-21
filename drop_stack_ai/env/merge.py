@@ -5,7 +5,12 @@ list of columns, each column being a list of tile values with the bottom
 entry at index ``0``.
 """
 from collections import deque
-from typing import List
+from typing import List, Tuple
+
+try:
+    from ._merge_cpp import drop_resolve_and_score as _cpp_drop_resolve_and_score
+except Exception:  # pragma: no cover - optional dependency
+    _cpp_drop_resolve_and_score = None
 
 
 Board = List[List[int]]
@@ -84,6 +89,13 @@ def drop_and_resolve(board: Board, value: int, col: int) -> None:
                 if r < len(board[nc]):
                     fresh.append((src, r))
                 break
+
+
+def drop_resolve_and_score(board: Board, value: int, col: int) -> Tuple[Board, int]:
+    """Call the C++ implementation and return the new board and reward."""
+    if _cpp_drop_resolve_and_score is None:
+        raise RuntimeError("C++ merge module is not available")
+    return _cpp_drop_resolve_and_score(board, value, col)
 
 
 def game_over(board: Board, max_height: int) -> bool:
