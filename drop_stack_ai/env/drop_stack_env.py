@@ -6,7 +6,13 @@ import random
 from collections import deque
 from typing import Dict, List
 
-from .merge import drop_and_resolve, print_board, game_over, Board
+from .merge import (
+    drop_and_resolve,
+    drop_resolve_and_score,
+    print_board,
+    game_over,
+    Board,
+)
 
 
 class DropStackEnv:
@@ -134,12 +140,10 @@ class DropStackEnv:
         if action_col < 0 or action_col >= self.COLUMN_COUNT:
             raise ValueError("Invalid column")
 
-        sim_board = [c.copy() for c in self.board]
-        reward = self._drop_resolve_and_score(sim_board, self.current_tile, action_col)
+        self.board, reward = drop_resolve_and_score(
+            self.board, self.current_tile, action_col
+        )
         self.score += reward
-
-        # Apply the actual drop using the reference implementation
-        drop_and_resolve(self.board, self.current_tile, action_col)
 
         # Update max tile
         if self.board:
