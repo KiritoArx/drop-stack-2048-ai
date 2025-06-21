@@ -24,12 +24,20 @@ The training code sets a default value for the `JAX_TRACEBACK_FILTERING`
 environment variable to disable traceback filtering. If you want different
 behaviour, you can override this variable before running the training scripts.
 
+## Installation
+
+Install the required Python packages with::
+
+    pip install -r requirements.txt
+
+This installs `jax`, `flax`, `optax` and the build tools needed for the C++
+extension.
+
 ## Building the C++ extension
 
 The merge logic is implemented in C++ and exposed to Python via `pybind11`.
-To build the extension in-place run::
+After installing the dependencies, build the extension in-place with::
 
-    pip install -r requirements.txt
     python setup.py build_ext --inplace
 
-This requires a C++17 compiler and `pybind11` installed.
+This requires a C++17 compiler.
