@@ -33,6 +33,16 @@ Install the required Python packages with::
 This installs `jax`, `flax`, `optax` and the build tools needed for the C++
 extension.
 
+For GPU acceleration you must install a CUDA-enabled `jaxlib` wheel. Follow the
+[official JAX installation instructions](https://jax.readthedocs.io/en/latest/installation.html#pip-install)
+and select the wheel that matches your CUDA and cuDNN versions. The `requirements.txt`
+file pins the base packages, but you can replace the CPU build with::
+
+    pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+If a GPU-capable `jaxlib` build is not installed, training will fall back to CPU
+execution.
+
 ## Building the C++ extension
 
 The merge logic is implemented in C++ and exposed to Python via `pybind11`.
