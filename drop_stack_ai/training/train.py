@@ -6,6 +6,8 @@ from typing import Any, Dict, Optional
 import os
 import argparse
 import pickle
+import threading
+import time
 
 os.environ.setdefault("JAX_TRACEBACK_FILTERING", "off")
 
@@ -15,7 +17,11 @@ from flax.training import train_state
 import optax
 
 from drop_stack_ai.model.network import DropStackNet, create_model
-from drop_stack_ai.selfplay.self_play import self_play, self_play_parallel
+from drop_stack_ai.selfplay.self_play import (
+    self_play,
+    self_play_parallel,
+    launch_self_play_workers,
+)
 from .replay_buffer import ReplayBuffer
 from drop_stack_ai.utils.serialization import load_params, save_params
 from drop_stack_ai.utils.state_utils import state_to_arrays
@@ -81,6 +87,9 @@ class TrainConfig:
     hidden_size: int = 128
     log_interval: int = 10
     checkpoint_path: Optional[str] = None
+    workers: int = 0
+    buffer_size: int = 1000
+    greedy_after: int | None = 10
 
 
 def create_train_state(
@@ -152,7 +161,21 @@ def train(
         config = TrainConfig()
 
     rng = jax.random.PRNGKey(seed)
+    sp_rng, rng = jax.random.split(rng)
     state, model = create_train_state(rng, config)
+
+    if config.workers > 0:
+        launch_self_play_workers(
+            model,
+            state.params,
+            sp_rng,
+            buffer,
+            workers=config.workers,
+            greedy_after=config.greedy_after,
+        )
+        # Give workers time to populate the buffer
+        while len(buffer) < config.batch_size:
+            time.sleep(0.1)
 
     devices = jax.local_devices()
     n_devices = len(devices)
@@ -173,6 +196,8 @@ def train(
         update_fn = jax.jit(make_update_fn(model))
 
     for step in range(1, config.steps + 1):
+        while len(buffer) < config.batch_size:
+            time.sleep(0.01)
         samples = buffer.sample(config.batch_size)
         batch = _prepare_batch(samples)
 
@@ -225,6 +250,18 @@ if __name__ == "__main__":
         help="Number of worker processes for self-play",
     )
     parser.add_argument(
+        "--workers",
+        type=int,
+        default=0,
+        help="Background self-play workers during training",
+    )
+    parser.add_argument(
+        "--buffer-size",
+        type=int,
+        default=1000,
+        help="Maximum episodes to store in the replay buffer",
+    )
+    parser.add_argument(
         "--steps", type=int, default=1000, help="Number of training steps"
     )
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
@@ -245,8 +282,9 @@ if __name__ == "__main__":
 
     if args.buffer:
         buffer = load_buffer(args.buffer)
+        buffer.max_episodes = args.buffer_size
     else:
-        buffer = ReplayBuffer()
+        buffer = ReplayBuffer(max_episodes=args.buffer_size)
 
     rng = jax.random.PRNGKey(args.seed)
     if args.self_play > 0:
@@ -276,5 +314,8 @@ if __name__ == "__main__":
         learning_rate=args.learning_rate,
         hidden_size=args.hidden_size,
         checkpoint_path=args.checkpoint,
+        workers=args.workers,
+        buffer_size=args.buffer_size,
+        greedy_after=args.greedy_after,
     )
     train(buffer, seed=args.seed, config=config)

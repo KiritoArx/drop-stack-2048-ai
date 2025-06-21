@@ -14,6 +14,7 @@ from drop_stack_ai.training.replay_buffer import ReplayBuffer
 from flax.serialization import to_bytes, from_bytes
 import multiprocessing as mp
 import os
+import threading
 
 
 def _play_episode(
@@ -153,3 +154,40 @@ def self_play_parallel(
         buffer.add_episode(states, policies, values)
 
     return rng
+
+
+def launch_self_play_workers(
+    model: DropStackNet,
+    params: Dict[str, Any],
+    rng: jax.random.PRNGKey,
+    buffer: ReplayBuffer,
+    *,
+    workers: int,
+    greedy: bool = False,
+    greedy_after: int | None = None,
+    simulations: int = 50,
+    c_puct: float = 1.0,
+) -> threading.Event:
+    """Start background self-play workers that continuously fill ``buffer``."""
+
+    stop_event = threading.Event()
+
+    def _loop() -> None:
+        nonlocal rng
+        while not stop_event.is_set():
+            rng = self_play_parallel(
+                model,
+                params,
+                rng,
+                buffer,
+                episodes=workers,
+                processes=workers,
+                greedy=greedy,
+                greedy_after=greedy_after,
+                simulations=simulations,
+                c_puct=c_puct,
+            )
+
+    thread = threading.Thread(target=_loop, daemon=True)
+    thread.start()
+    return stop_event
