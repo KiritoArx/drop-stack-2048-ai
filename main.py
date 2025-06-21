@@ -8,6 +8,7 @@ from drop_stack_ai.selfplay.self_play import self_play
 from drop_stack_ai.training.replay_buffer import ReplayBuffer
 from drop_stack_ai.training.train import TrainConfig, train
 from drop_stack_ai.utils.serialization import load_params
+from drop_stack_ai.selfplay.evaluate import evaluate_model
 
 
 def run_cycle(episodes: int, seed: int, config: TrainConfig) -> None:
@@ -30,6 +31,26 @@ def run_cycle(episodes: int, seed: int, config: TrainConfig) -> None:
     print("[run_cycle] starting training")
     train(buffer, seed=seed, config=config)
     print("[run_cycle] training complete")
+
+    # Evaluate the newly trained model
+    if config.checkpoint_path:
+        print("[run_cycle] evaluating model")
+        params = load_params(config.checkpoint_path, params)
+        avg_score = evaluate_model(model, params, games=50, seed=seed)
+        best_path = config.checkpoint_path + ".best"
+        score_path = best_path + ".txt"
+        best_score = 0.0
+        if os.path.exists(score_path):
+            with open(score_path) as f:
+                best_score = float(f.read())
+        print(f"[run_cycle] average score={avg_score:.2f} best={best_score:.2f}")
+        if avg_score > best_score:
+            import shutil
+
+            shutil.copy(config.checkpoint_path, best_path)
+            with open(score_path, "w") as f:
+                f.write(str(avg_score))
+            print("[run_cycle] promoted new model")
 
 
 def main() -> None:
