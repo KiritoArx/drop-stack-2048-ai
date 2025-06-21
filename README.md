@@ -13,6 +13,9 @@ agent samples moves in proportion to the MCTS visit counts. The `--greedy-after`
 flag controls after how many moves the policy becomes greedy and always selects
 the most-visited action.
 
+You can speed up data generation by running multiple self-play episodes in
+parallel using the `--processes` option.
+
 After each training cycle the new model plays a set of test games to measure
 its average score. If this score beats the previous best, the checkpoint is
 promoted and stored alongside the current best score.
