@@ -9,19 +9,7 @@ import jax.numpy as jnp
 
 from drop_stack_ai.env.drop_stack_env import DropStackEnv
 from .network import DropStackNet
-
-
-def _state_to_arrays(
-    state: Dict[str, object],
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Convert env state dict into arrays for the model."""
-    board = jnp.zeros((5, 6), dtype=jnp.float32)
-    for c, col in enumerate(state["board"]):
-        if col:
-            board = board.at[c, : len(col)].set(jnp.array(col, dtype=jnp.float32))
-    current = jnp.array(state["current_tile"], dtype=jnp.float32)
-    next_tile = jnp.array(state["next_tile"], dtype=jnp.float32)
-    return board, current, next_tile
+from drop_stack_ai.utils.state_utils import state_to_arrays
 
 
 @dataclass
@@ -83,7 +71,7 @@ def run_mcts(
         if sim_env.done:
             value = math.log(sim_env.score + 1)
         else:
-            board, current, next_tile = _state_to_arrays(sim_env.get_state())
+            board, current, next_tile = state_to_arrays(sim_env.get_state())
             logits, value_pred = model.apply(params, board, current, next_tile)
             policy = jax.nn.softmax(logits)
             if not node.children:
