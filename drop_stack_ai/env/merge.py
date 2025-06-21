@@ -91,11 +91,68 @@ def drop_and_resolve(board: Board, value: int, col: int) -> None:
                 break
 
 
+def _python_drop_resolve_and_score(board: Board, value: int, col: int) -> Tuple[Board, int]:
+    """Pure-Python implementation mirroring ``DropStackEnv._drop_resolve_and_score``."""
+    board[col].append(value)
+    row = len(board[col]) - 1
+    landing_col = col
+    landing_row = row
+
+    reward = 0
+    fresh: deque[tuple[int, int]] = deque([(col, row)])
+
+    while fresh:
+        c, r = fresh.popleft()
+        if r >= len(board[c]):
+            continue
+        v = board[c][r]
+
+        # vertical-down
+        if r > 0 and board[c][r - 1] == v:
+            board[c][r - 1] *= 2
+            reward += board[c][r - 1]
+            del board[c][r]
+            fresh.appendleft((c, r - 1))
+            if r < len(board[c]):
+                fresh.append((c, r))
+            continue
+
+        # vertical-up
+        if r + 1 < len(board[c]) and board[c][r + 1] == v:
+            board[c][r] *= 2
+            reward += board[c][r]
+            del board[c][r + 1]
+            fresh.appendleft((c, r))
+            if r + 1 < len(board[c]):
+                fresh.append((c, r + 1))
+            continue
+
+        # horizontal
+        for dc in (-1, 1):
+            nc = c + dc
+            if nc < 0 or nc >= len(board):
+                continue
+            if r < len(board[nc]) and board[nc][r] == v:
+                keep_right = r == landing_row and nc == landing_col
+                dst = nc if keep_right else c
+                src = c if keep_right else nc
+
+                board[dst][r] *= 2
+                reward += board[dst][r]
+                del board[src][r]
+
+                fresh.appendleft((dst, r))
+                if r < len(board[nc]):
+                    fresh.append((src, r))
+                break
+    return board, reward
+
+
 def drop_resolve_and_score(board: Board, value: int, col: int) -> Tuple[Board, int]:
-    """Call the C++ implementation and return the new board and reward."""
-    if _cpp_drop_resolve_and_score is None:
-        raise RuntimeError("C++ merge module is not available")
-    return _cpp_drop_resolve_and_score(board, value, col)
+    """Resolve merges and score using C++ if available, otherwise fallback to Python."""
+    if _cpp_drop_resolve_and_score is not None:
+        return _cpp_drop_resolve_and_score(board, value, col)
+    return _python_drop_resolve_and_score(board, value, col)
 
 
 def game_over(board: Board, max_height: int) -> bool:
