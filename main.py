@@ -7,6 +7,7 @@ from drop_stack_ai.model.network import create_model
 from drop_stack_ai.selfplay.self_play import self_play
 from drop_stack_ai.training.replay_buffer import ReplayBuffer
 from drop_stack_ai.training.train import TrainConfig, train
+from drop_stack_ai.utils.serialization import load_params
 
 
 def run_cycle(episodes: int, seed: int, config: TrainConfig) -> None:
@@ -16,6 +17,9 @@ def run_cycle(episodes: int, seed: int, config: TrainConfig) -> None:
     )
     rng = jax.random.PRNGKey(seed)
     model, params = create_model(rng, hidden_size=config.hidden_size)
+    if config.checkpoint_path and os.path.exists(config.checkpoint_path):
+        print(f"[run_cycle] loading checkpoint from {config.checkpoint_path}")
+        params = load_params(config.checkpoint_path, params)
     buffer = ReplayBuffer()
     for i in range(episodes):
         print(f"[run_cycle] self-play episode {i + 1}/{episodes}")
@@ -42,6 +46,7 @@ def main() -> None:
         help="Path to save or load model parameters",
     )
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument("--cycles", type=int, default=1, help="Number of training cycles to run")
     args = parser.parse_args()
 
     os.environ.setdefault("JAX_TRACEBACK_FILTERING", "off")
@@ -53,7 +58,9 @@ def main() -> None:
         hidden_size=args.hidden_size,
         checkpoint_path=args.checkpoint,
     )
-    run_cycle(args.episodes, args.seed, config)
+    for cycle in range(args.cycles):
+        print(f"[main] starting cycle {cycle + 1}/{args.cycles}")
+        run_cycle(args.episodes, args.seed + cycle, config)
 
 
 if __name__ == "__main__":
