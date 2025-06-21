@@ -30,6 +30,7 @@ def self_play(
     the policy target. Moves are selected proportionally to this distribution
     when ``greedy`` is ``False`` and greedily otherwise.
     """
+    print("[self_play] starting episode")
     env = DropStackEnv()
     states: List[Dict[str, Any]] = []
     policies: List[jnp.ndarray] = []
@@ -62,4 +63,5 @@ def self_play(
     final_score = math.log(env.score + 1)
     values = [float(final_score)] * len(values)
     buffer.add_episode(states, policies, values)
+    print(f"[self_play] finished episode with score={env.score}")
     return rng
