@@ -17,7 +17,7 @@ def run_cycle(
     config: TrainConfig,
     *,
     greedy_after: int | None = None,
-    processes: int = 1,
+    processes: int | None = None,
 ) -> None:
     """Run self-play to populate a buffer then train a model."""
     print(
@@ -29,7 +29,7 @@ def run_cycle(
         print(f"[run_cycle] loading checkpoint from {config.checkpoint_path}")
         params = load_params(config.checkpoint_path, params)
     buffer = ReplayBuffer()
-    if processes > 1:
+    if processes is None or processes > 1:
         rng = self_play_parallel(
             model,
             params,
@@ -98,8 +98,8 @@ def main() -> None:
     parser.add_argument(
         "--processes",
         type=int,
-        default=1,
-        help="Number of worker processes for self-play",
+        default=None,
+        help="Number of worker processes for self-play (default: all CPUs)",
     )
     args = parser.parse_args()
 
