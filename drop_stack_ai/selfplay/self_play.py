@@ -13,6 +13,7 @@ from drop_stack_ai.model.mcts import run_mcts
 from drop_stack_ai.training.replay_buffer import ReplayBuffer
 from flax.serialization import to_bytes, from_bytes
 import multiprocessing as mp
+import os
 
 
 def _play_episode(
@@ -92,10 +93,11 @@ def self_play(
 def _worker(args: Tuple[int, bytes, int, bool, int | None, int, float]):
     """Helper for ``self_play_parallel`` running in a separate process."""
     seed, params_bytes, hidden_size, greedy, greedy_after, simulations, c_puct = args
+    print(f"[worker] pid={os.getpid()} seed={seed} starting")
     rng = jax.random.PRNGKey(seed)
     model, params = create_model(rng, hidden_size=hidden_size)
     params = from_bytes(params, params_bytes)
-    _, states, policies, values, _ = _play_episode(
+    _, states, policies, values, score = _play_episode(
         model,
         params,
         rng,
@@ -104,6 +106,7 @@ def _worker(args: Tuple[int, bytes, int, bool, int | None, int, float]):
         simulations=simulations,
         c_puct=c_puct,
     )
+    print(f"[worker] pid={os.getpid()} seed={seed} finished score={score}")
     return states, policies, values
 
 
@@ -121,6 +124,9 @@ def self_play_parallel(
     c_puct: float = 1.0,
 ) -> jax.random.PRNGKey:
     """Run ``episodes`` self-play games in parallel."""
+    print(
+        f"[self_play_parallel] episodes={episodes} processes={processes}"
+    )
     params_bytes = to_bytes(params)
     keys = jax.random.split(rng, episodes + 1)
     rng = keys[0]
