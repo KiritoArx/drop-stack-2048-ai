@@ -18,21 +18,12 @@ from drop_stack_ai.model.network import DropStackNet, create_model
 from drop_stack_ai.selfplay.self_play import self_play
 from .replay_buffer import ReplayBuffer
 from drop_stack_ai.utils.serialization import load_params, save_params
+from drop_stack_ai.utils.state_utils import state_to_arrays
 
 
 # -----------------------------------------------------------------------------
 # Utilities
 # -----------------------------------------------------------------------------
-
-def _state_to_arrays(state: Dict[str, Any]) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Convert env state dict into model input arrays."""
-    board = jnp.zeros((5, 6), dtype=jnp.float32)
-    for c, col in enumerate(state["board"]):
-        if col:
-            board = board.at[c, : len(col)].set(jnp.array(col, dtype=jnp.float32))
-    current = jnp.array(state["current_tile"], dtype=jnp.float32)
-    next_tile = jnp.array(state["next_tile"], dtype=jnp.float32)
-    return board, current, next_tile
 
 
 def _prepare_batch(samples: list[Dict[str, Any]]) -> Dict[str, jnp.ndarray]:
@@ -42,7 +33,7 @@ def _prepare_batch(samples: list[Dict[str, Any]]) -> Dict[str, jnp.ndarray]:
     policies = []
     values = []
     for item in samples:
-        b, c, n = _state_to_arrays(item["state"])
+        b, c, n = state_to_arrays(item["state"])
         boards.append(b)
         currents.append(c)
         nexts.append(n)
@@ -81,6 +72,7 @@ def load_buffer(path: str) -> ReplayBuffer:
 # Training state
 # -----------------------------------------------------------------------------
 
+
 @dataclass
 class TrainConfig:
     batch_size: int = 32
@@ -91,22 +83,30 @@ class TrainConfig:
     checkpoint_path: Optional[str] = None
 
 
-def create_train_state(rng: jax.random.PRNGKey, config: TrainConfig) -> train_state.TrainState:
+def create_train_state(
+    rng: jax.random.PRNGKey, config: TrainConfig
+) -> train_state.TrainState:
     model, params = create_model(rng, hidden_size=config.hidden_size)
     if config.checkpoint_path and os.path.exists(config.checkpoint_path):
         print(f"Loading checkpoint from {config.checkpoint_path}")
         params = load_params(config.checkpoint_path, params)
     tx = optax.adam(config.learning_rate)
-    return train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx), model
+    return (
+        train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx),
+        model,
+    )
 
 
 # -----------------------------------------------------------------------------
 # Training step
 # -----------------------------------------------------------------------------
 
+
 def make_update_fn(model: DropStackNet):
     def loss_fn(params, batch):
-        logits, value_pred = model.apply(params, batch["board"], batch["current"], batch["next"])
+        logits, value_pred = model.apply(
+            params, batch["board"], batch["current"], batch["next"]
+        )
         # ``batch['policy']`` contains the MCTS visit probability distribution.
         policy_loss = optax.softmax_cross_entropy(logits, batch["policy"]).mean()
         # Values are stored as ``log(final_score + 1)`` for each step.
@@ -115,7 +115,9 @@ def make_update_fn(model: DropStackNet):
         return loss, (policy_loss, value_loss)
 
     def train_step(state: train_state.TrainState, batch: Dict[str, jnp.ndarray]):
-        (loss, (p_loss, v_loss)), grads = jax.value_and_grad(loss_fn, has_aux=True)(state.params, batch)
+        (loss, (p_loss, v_loss)), grads = jax.value_and_grad(loss_fn, has_aux=True)(
+            state.params, batch
+        )
         state = state.apply_gradients(grads=grads)
         metrics = {
             "loss": loss,
@@ -142,7 +144,10 @@ def pmap_update_fn(model: DropStackNet):
 # Training loop
 # -----------------------------------------------------------------------------
 
-def train(buffer: ReplayBuffer, *, seed: int = 0, config: TrainConfig | None = None) -> None:
+
+def train(
+    buffer: ReplayBuffer, *, seed: int = 0, config: TrainConfig | None = None
+) -> None:
     if config is None:
         config = TrainConfig()
 
@@ -174,7 +179,10 @@ def train(buffer: ReplayBuffer, *, seed: int = 0, config: TrainConfig | None = N
         if n_devices > 1:
             # reshape batch for pmapping
             per_dev = config.batch_size // n_devices
-            batch = {k: v.reshape((n_devices, per_dev) + v.shape[1:]) for k, v in batch.items()}
+            batch = {
+                k: v.reshape((n_devices, per_dev) + v.shape[1:])
+                for k, v in batch.items()
+            }
         state, metrics = update_fn(state, batch)
 
         if step == 1 or step == config.steps or step % config.log_interval == 0:
@@ -198,17 +206,28 @@ def train(buffer: ReplayBuffer, *, seed: int = 0, config: TrainConfig | None = N
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Drop Stack 2048 model")
     parser.add_argument("--buffer", type=str, help="Path to replay buffer pickle")
-    parser.add_argument("--self-play", type=int, default=0, help="Generate this many self-play episodes before training")
+    parser.add_argument(
+        "--self-play",
+        type=int,
+        default=0,
+        help="Generate this many self-play episodes before training",
+    )
     parser.add_argument(
         "--greedy-after",
         type=int,
         default=10,
         help="Number of moves to sample probabilistically before switching to greedy play during self-play",
     )
-    parser.add_argument("--steps", type=int, default=1000, help="Number of training steps")
+    parser.add_argument(
+        "--steps", type=int, default=1000, help="Number of training steps"
+    )
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
-    parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate")
-    parser.add_argument("--hidden-size", type=int, default=128, help="Model hidden size")
+    parser.add_argument(
+        "--learning-rate", type=float, default=1e-3, help="Learning rate"
+    )
+    parser.add_argument(
+        "--hidden-size", type=int, default=128, help="Model hidden size"
+    )
     parser.add_argument(
         "--checkpoint",
         type=str,
