@@ -15,7 +15,7 @@ from flax.training import train_state
 import optax
 
 from drop_stack_ai.model.network import DropStackNet, create_model
-from drop_stack_ai.selfplay.self_play import self_play
+from drop_stack_ai.selfplay.self_play import self_play, self_play_parallel
 from .replay_buffer import ReplayBuffer
 from drop_stack_ai.utils.serialization import load_params, save_params
 from drop_stack_ai.utils.state_utils import state_to_arrays
@@ -219,6 +219,12 @@ if __name__ == "__main__":
         help="Number of moves to sample probabilistically before switching to greedy play during self-play",
     )
     parser.add_argument(
+        "--processes",
+        type=int,
+        default=1,
+        help="Number of worker processes for self-play",
+    )
+    parser.add_argument(
         "--steps", type=int, default=1000, help="Number of training steps"
     )
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
@@ -245,8 +251,21 @@ if __name__ == "__main__":
     rng = jax.random.PRNGKey(args.seed)
     if args.self_play > 0:
         model, params = create_model(rng, hidden_size=args.hidden_size)
-        for _ in range(args.self_play):
-            rng = self_play(model, params, rng, buffer, greedy_after=args.greedy_after)
+        if args.processes > 1:
+            rng = self_play_parallel(
+                model,
+                params,
+                rng,
+                buffer,
+                episodes=args.self_play,
+                processes=args.processes,
+                greedy_after=args.greedy_after,
+            )
+        else:
+            for _ in range(args.self_play):
+                rng = self_play(
+                    model, params, rng, buffer, greedy_after=args.greedy_after
+                )
 
     if len(buffer) == 0:
         raise ValueError("Replay buffer is empty")
