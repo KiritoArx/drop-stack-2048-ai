@@ -199,6 +199,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Drop Stack 2048 model")
     parser.add_argument("--buffer", type=str, help="Path to replay buffer pickle")
     parser.add_argument("--self-play", type=int, default=0, help="Generate this many self-play episodes before training")
+    parser.add_argument(
+        "--greedy-after",
+        type=int,
+        default=10,
+        help="Number of moves to sample probabilistically before switching to greedy play during self-play",
+    )
     parser.add_argument("--steps", type=int, default=1000, help="Number of training steps")
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
     parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate")
@@ -221,7 +227,7 @@ if __name__ == "__main__":
     if args.self_play > 0:
         model, params = create_model(rng, hidden_size=args.hidden_size)
         for _ in range(args.self_play):
-            rng = self_play(model, params, rng, buffer)
+            rng = self_play(model, params, rng, buffer, greedy_after=args.greedy_after)
 
     if len(buffer) == 0:
         raise ValueError("Replay buffer is empty")
