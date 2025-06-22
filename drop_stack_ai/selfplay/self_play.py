@@ -143,7 +143,7 @@ def self_play_parallel(
     rng = keys[0]
     seeds = [int(jax.random.randint(k, (), 0, 2**31 - 1)) for k in keys[1:]]
 
-    dtype_name = str(model.dtype).split(".")[-1]
+    dtype_name = jnp.dtype(model.dtype).name
     args = [
         (
             seed,
