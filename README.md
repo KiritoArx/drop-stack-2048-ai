@@ -13,6 +13,10 @@ agent samples moves in proportion to the MCTS visit counts. The `--greedy-after`
 flag controls after how many moves the policy becomes greedy and always selects
 the most-visited action.
 
+Training uses an asynchronous data loader that prefetches batches on a
+background thread so the GPU remains busy. Mixed precision can be enabled with
+the `--mixed-precision` flag to reduce memory usage and speed up training.
+
 You can speed up data generation by running multiple self-play episodes in
 parallel using the `--processes` option.
 

@@ -11,6 +11,7 @@ class DropStackNet(nn.Module):
     """Simple policy and value network for Drop Stack 2048."""
 
     hidden_size: int = 128
+    dtype: jnp.dtype = jnp.float32
 
     @nn.compact
     def __call__(self, board: jnp.ndarray, current_tile: jnp.ndarray, next_tile: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
@@ -40,22 +41,27 @@ class DropStackNet(nn.Module):
             tile_feats = jnp.log2(jnp.maximum(jnp.stack([current_tile, next_tile]), 1))
             x = jnp.concatenate([board_flat, tile_feats], axis=0)
 
-        x = nn.Dense(self.hidden_size)(x)
+        x = nn.Dense(self.hidden_size, dtype=self.dtype)(x)
         x = nn.relu(x)
-        x = nn.Dense(self.hidden_size)(x)
+        x = nn.Dense(self.hidden_size, dtype=self.dtype)(x)
         x = nn.relu(x)
 
         # Two separate heads: policy provides logits for MCTS priors, value
         # produces a scalar evaluation of the current position.
-        policy_logits = nn.Dense(5)(x)
-        value = nn.Dense(1)(x)
+        policy_logits = nn.Dense(5, dtype=self.dtype)(x)
+        value = nn.Dense(1, dtype=self.dtype)(x)
         value = value.squeeze(axis=-1)
-        return policy_logits, value
+        return policy_logits.astype(jnp.float32), value.astype(jnp.float32)
 
 
-def create_model(rng: jax.random.PRNGKey, *, hidden_size: int = 128) -> tuple[DropStackNet, dict]:
+def create_model(
+    rng: jax.random.PRNGKey,
+    *,
+    hidden_size: int = 128,
+    dtype: jnp.dtype = jnp.float32,
+) -> tuple[DropStackNet, dict]:
     """Utility to create the model and initialise its parameters on the default device."""
-    model = DropStackNet(hidden_size=hidden_size)
+    model = DropStackNet(hidden_size=hidden_size, dtype=dtype)
     dummy_board = jnp.zeros((5, 6), jnp.float32)
     dummy_tile = jnp.array(2, jnp.float32)
     params = model.init(rng, dummy_board, dummy_tile, dummy_tile)
