@@ -78,11 +78,11 @@ def run_cycle(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Drop Stack 2048 training cycle")
-    parser.add_argument("--episodes", type=int, default=10, help="Number of self-play episodes")
-    parser.add_argument("--steps", type=int, default=1000, help="Training steps")
-    parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
-    parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate")
-    parser.add_argument("--hidden-size", type=int, default=128, help="Model hidden size")
+    parser.add_argument("--episodes", type=int, default=100000, help="Number of self-play episodes")
+    parser.add_argument("--steps", type=int, default=1000000, help="Training steps")
+    parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
+    parser.add_argument("--learning-rate", type=float, default=2e-3, help="Learning rate")
+    parser.add_argument("--hidden-size", type=int, default=1024, help="Model hidden size")
     parser.add_argument(
         "--checkpoint",
         type=str,
