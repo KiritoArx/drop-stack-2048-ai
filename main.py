@@ -80,8 +80,8 @@ def run_cycle(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Drop Stack 2048 training cycle")
-    parser.add_argument("--episodes", type=int, default=100000, help="Number of self-play episodes")
-    parser.add_argument("--steps", type=int, default=1000000, help="Training steps")
+    parser.add_argument("--episodes", type=int, default=20000, help="Number of self-play episodes")
+    parser.add_argument("--steps", type=int, default=100000, help="Training steps")
     parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
     parser.add_argument("--learning-rate", type=float, default=2e-3, help="Learning rate")
     parser.add_argument("--hidden-size", type=int, default=1024, help="Model hidden size")
@@ -97,7 +97,7 @@ def main() -> None:
         help="Path to save or load model parameters",
     )
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
-    parser.add_argument("--cycles", type=int, default=1, help="Number of training cycles to run")
+    parser.add_argument("--cycles", type=int, default=20, help="Number of training cycles to run")
     parser.add_argument(
         "--greedy-after",
         type=int,
