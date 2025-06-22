@@ -2,6 +2,7 @@ import os
 import argparse
 
 import jax
+import jax.numpy as jnp
 
 from drop_stack_ai.utils.device_info import print_device_info
 
@@ -26,7 +27,8 @@ def run_cycle(
         f"[run_cycle] starting: episodes={episodes} seed={seed} hidden_size={config.hidden_size}"
     )
     rng = jax.random.PRNGKey(seed)
-    model, params = create_model(rng, hidden_size=config.hidden_size)
+    dtype = jnp.float16 if config.mixed_precision else jnp.float32
+    model, params = create_model(rng, hidden_size=config.hidden_size, dtype=dtype)
     if config.checkpoint_path and os.path.exists(config.checkpoint_path):
         print(f"[run_cycle] loading checkpoint from {config.checkpoint_path}")
         params = load_params(config.checkpoint_path, params)
@@ -84,6 +86,11 @@ def main() -> None:
     parser.add_argument("--learning-rate", type=float, default=2e-3, help="Learning rate")
     parser.add_argument("--hidden-size", type=int, default=1024, help="Model hidden size")
     parser.add_argument(
+        "--mixed-precision",
+        action="store_true",
+        help="Enable mixed precision training",
+    )
+    parser.add_argument(
         "--checkpoint",
         type=str,
         default=os.path.join("checkpoints", "model.msgpack"),
@@ -115,6 +122,7 @@ def main() -> None:
         learning_rate=args.learning_rate,
         hidden_size=args.hidden_size,
         checkpoint_path=args.checkpoint,
+        mixed_precision=args.mixed_precision,
     )
     for cycle in range(args.cycles):
         print(f"[main] starting cycle {cycle + 1}/{args.cycles}")

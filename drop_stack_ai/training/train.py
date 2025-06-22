@@ -23,44 +23,11 @@ from drop_stack_ai.selfplay.self_play import (
     self_play_parallel,
     launch_self_play_workers,
 )
+from .data_loader import data_loader
 from .replay_buffer import ReplayBuffer
 from drop_stack_ai.utils.serialization import load_params, save_params
-from drop_stack_ai.utils.state_utils import state_to_arrays
 
 
-# -----------------------------------------------------------------------------
-# Utilities
-# -----------------------------------------------------------------------------
-
-
-def _prepare_batch(samples: list[Dict[str, Any]]) -> Dict[str, jnp.ndarray]:
-    boards = []
-    currents = []
-    nexts = []
-    policies = []
-    values = []
-    for item in samples:
-        b, c, n = state_to_arrays(item["state"])
-        boards.append(b)
-        currents.append(c)
-        nexts.append(n)
-        policy = jnp.array(item["policy"], dtype=jnp.float32)
-        if policy.ndim == 1 and policy.sum() != 0:
-            # Ensure policy represents a probability distribution. The
-            # replay buffer may store raw visit counts from MCTS.
-            policy = policy / policy.sum()
-        policies.append(policy)
-
-        # ``value`` stores ``log(final_score + 1)`` for the episode.
-        values.append(jnp.array(item["value"], dtype=jnp.float32))
-    batch = {
-        "board": jnp.stack(boards),
-        "current": jnp.stack(currents),
-        "next": jnp.stack(nexts),
-        "policy": jnp.stack(policies),
-        "value": jnp.stack(values),
-    }
-    return batch
 
 
 def load_buffer(path: str) -> ReplayBuffer:
@@ -82,21 +49,23 @@ def load_buffer(path: str) -> ReplayBuffer:
 
 @dataclass
 class TrainConfig:
-    batch_size: int = 32
-    steps: int = 1000
-    learning_rate: float = 1e-3
-    hidden_size: int = 128
+    batch_size: int = 256
+    steps: int = 1_000_000
+    learning_rate: float = 2e-3
+    hidden_size: int = 1024
     log_interval: int = 10
     checkpoint_path: Optional[str] = None
     workers: int = 0
     buffer_size: int = 200_000
     greedy_after: int | None = 10
+    mixed_precision: bool = False
 
 
 def create_train_state(
     rng: jax.random.PRNGKey, config: TrainConfig
 ) -> train_state.TrainState:
-    model, params = create_model(rng, hidden_size=config.hidden_size)
+    dtype = jnp.float16 if config.mixed_precision else jnp.float32
+    model, params = create_model(rng, hidden_size=config.hidden_size, dtype=dtype)
     if config.checkpoint_path and os.path.exists(config.checkpoint_path):
         print(f"Loading checkpoint from {config.checkpoint_path}")
         params = load_params(config.checkpoint_path, params)
@@ -165,6 +134,8 @@ def train(
     print_device_info()
     sp_rng, rng = jax.random.split(rng)
     state, model = create_train_state(rng, config)
+    if config.mixed_precision:
+        jax.config.update("jax_default_matmul_precision", "float16")
 
     if config.workers > 0:
         launch_self_play_workers(
@@ -197,19 +168,10 @@ def train(
     else:
         update_fn = jax.jit(make_update_fn(model))
 
-    for step in range(1, config.steps + 1):
-        while len(buffer) < config.batch_size:
-            time.sleep(0.01)
-        samples = buffer.sample(config.batch_size)
-        batch = _prepare_batch(samples)
+    loader = data_loader(buffer, config.batch_size, devices=devices, prefetch=2)
 
-        if n_devices > 1:
-            # reshape batch for pmapping
-            per_dev = config.batch_size // n_devices
-            batch = {
-                k: v.reshape((n_devices, per_dev) + v.shape[1:])
-                for k, v in batch.items()
-            }
+    for step in range(1, config.steps + 1):
+        batch = next(loader)
         state, metrics = update_fn(state, batch)
 
         if step == 1 or step == config.steps or step % config.log_interval == 0:
@@ -264,14 +226,19 @@ if __name__ == "__main__":
         help="Maximum episodes to store in the replay buffer",
     )
     parser.add_argument(
-        "--steps", type=int, default=1000, help="Number of training steps"
+        "--steps", type=int, default=1_000_000, help="Number of training steps"
     )
-    parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
+    parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
     parser.add_argument(
-        "--learning-rate", type=float, default=1e-3, help="Learning rate"
+        "--learning-rate", type=float, default=2e-3, help="Learning rate"
     )
     parser.add_argument(
-        "--hidden-size", type=int, default=128, help="Model hidden size"
+        "--hidden-size", type=int, default=1024, help="Model hidden size"
+    )
+    parser.add_argument(
+        "--mixed-precision",
+        action="store_true",
+        help="Enable mixed precision training",
     )
     parser.add_argument(
         "--checkpoint",
@@ -290,7 +257,8 @@ if __name__ == "__main__":
 
     rng = jax.random.PRNGKey(args.seed)
     if args.self_play > 0:
-        model, params = create_model(rng, hidden_size=args.hidden_size)
+        dtype = jnp.float16 if args.mixed_precision else jnp.float32
+        model, params = create_model(rng, hidden_size=args.hidden_size, dtype=dtype)
         if args.processes > 1:
             rng = self_play_parallel(
                 model,
@@ -319,5 +287,6 @@ if __name__ == "__main__":
         workers=args.workers,
         buffer_size=args.buffer_size,
         greedy_after=args.greedy_after,
+        mixed_precision=args.mixed_precision,
     )
     train(buffer, seed=args.seed, config=config)

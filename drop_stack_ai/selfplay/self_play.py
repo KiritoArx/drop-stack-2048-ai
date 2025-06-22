@@ -93,12 +93,22 @@ def self_play(
     return rng
 
 
-def _worker(args: Tuple[int, bytes, int, bool, int | None, int, float]):
+def _worker(args: Tuple[int, bytes, int, str, bool, int | None, int, float]):
     """Helper for ``self_play_parallel`` running in a separate process."""
-    seed, params_bytes, hidden_size, greedy, greedy_after, simulations, c_puct = args
+    (
+        seed,
+        params_bytes,
+        hidden_size,
+        dtype_name,
+        greedy,
+        greedy_after,
+        simulations,
+        c_puct,
+    ) = args
     print(f"[worker] pid={os.getpid()} seed={seed} starting")
     rng = jax.random.PRNGKey(seed)
-    model, params = create_model(rng, hidden_size=hidden_size)
+    dtype = getattr(jnp, dtype_name)
+    model, params = create_model(rng, hidden_size=hidden_size, dtype=dtype)
     params = from_bytes(params, params_bytes)
     _, states, policies, values, score = _play_episode(
         model,
@@ -133,11 +143,13 @@ def self_play_parallel(
     rng = keys[0]
     seeds = [int(jax.random.randint(k, (), 0, 2**31 - 1)) for k in keys[1:]]
 
+    dtype_name = str(model.dtype).split(".")[-1]
     args = [
         (
             seed,
             params_bytes,
             model.hidden_size,
+            dtype_name,
             greedy,
             greedy_after,
             simulations,
