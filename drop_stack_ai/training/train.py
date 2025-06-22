@@ -50,7 +50,7 @@ def load_buffer(path: str) -> ReplayBuffer:
 @dataclass
 class TrainConfig:
     batch_size: int = 256
-    steps: int = 1_000_000
+    steps: int = 100_000
     learning_rate: float = 2e-3
     hidden_size: int = 1024
     log_interval: int = 10
@@ -226,7 +226,7 @@ if __name__ == "__main__":
         help="Maximum episodes to store in the replay buffer",
     )
     parser.add_argument(
-        "--steps", type=int, default=1_000_000, help="Number of training steps"
+        "--steps", type=int, default=100_000, help="Number of training steps"
     )
     parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
     parser.add_argument(
