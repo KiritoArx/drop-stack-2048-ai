@@ -26,7 +26,9 @@ def _play_episode(
     greedy_after: int | None = None,
     simulations: int = 50,
     c_puct: float = 1.0,
-) -> Tuple[jax.random.PRNGKey, List[Dict[str, Any]], List[jnp.ndarray], List[float], int]:
+) -> Tuple[
+    jax.random.PRNGKey, List[Dict[str, Any]], List[jnp.ndarray], List[float], int
+]:
     """Return data for a single self-play episode."""
     env = DropStackEnv()
     states: List[Dict[str, Any]] = []
@@ -125,9 +127,7 @@ def self_play_parallel(
     c_puct: float = 1.0,
 ) -> jax.random.PRNGKey:
     """Run ``episodes`` self-play games in parallel."""
-    print(
-        f"[self_play_parallel] episodes={episodes} processes={processes}"
-    )
+    print(f"[self_play_parallel] episodes={episodes} processes={processes}")
     params_bytes = to_bytes(params)
     keys = jax.random.split(rng, episodes + 1)
     rng = keys[0]
@@ -147,8 +147,17 @@ def self_play_parallel(
     ]
 
     ctx = mp.get_context("spawn")
-    with ctx.Pool(processes) as pool:
-        results = pool.map(_worker, args)
+    # Ensure workers do not consume GPU resources
+    prev_cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    try:
+        with ctx.Pool(processes) as pool:
+            results = pool.map(_worker, args)
+    finally:
+        if prev_cuda_visible is None:
+            os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+        else:
+            os.environ["CUDA_VISIBLE_DEVICES"] = prev_cuda_visible
 
     for states, policies, values in results:
         buffer.add_episode(states, policies, values)
