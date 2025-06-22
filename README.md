@@ -51,3 +51,15 @@ After installing the dependencies, build the extension in-place with::
     python setup.py build_ext --inplace
 
 This requires a C++17 compiler.
+
+## CPU self-play workers
+
+Parallel self-play uses multiprocessing to speed up data generation. Before
+launching worker processes the `self_play_parallel` function clears
+`CUDA_VISIBLE_DEVICES` so the workers run entirely on the CPU even when the
+training step uses a GPU. JAX may report errors such as::
+
+    Jax plugin configuration error: ... CUDA_ERROR_NO_DEVICE
+
+These messages are harmless and simply indicate that the workers do not have GPU
+access. You can redirect or suppress them if desired.
