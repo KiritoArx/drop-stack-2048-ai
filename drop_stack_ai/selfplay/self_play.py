@@ -149,7 +149,10 @@ def self_play_parallel(
     ctx = mp.get_context("spawn")
     # Ensure workers do not consume GPU resources
     prev_cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    prev_jax_platform = os.environ.get("JAX_PLATFORM_NAME")
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    os.environ["JAX_PLATFORM_NAME"] = "cpu"
+    print("[self_play_parallel] running workers on CPU")
     try:
         with ctx.Pool(processes) as pool:
             results = pool.map(_worker, args)
@@ -158,6 +161,10 @@ def self_play_parallel(
             os.environ.pop("CUDA_VISIBLE_DEVICES", None)
         else:
             os.environ["CUDA_VISIBLE_DEVICES"] = prev_cuda_visible
+        if prev_jax_platform is None:
+            os.environ.pop("JAX_PLATFORM_NAME", None)
+        else:
+            os.environ["JAX_PLATFORM_NAME"] = prev_jax_platform
 
     for states, policies, values in results:
         buffer.add_episode(states, policies, values)
