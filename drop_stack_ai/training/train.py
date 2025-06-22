@@ -89,7 +89,7 @@ class TrainConfig:
     log_interval: int = 10
     checkpoint_path: Optional[str] = None
     workers: int = 0
-    buffer_size: int = 1000
+    buffer_size: int = 200_000
     greedy_after: int | None = 10
 
 
@@ -260,7 +260,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--buffer-size",
         type=int,
-        default=1000,
+        default=200_000,
         help="Maximum episodes to store in the replay buffer",
     )
     parser.add_argument(
