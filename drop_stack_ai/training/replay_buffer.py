@@ -9,7 +9,7 @@ from collections import deque
 class ReplayBuffer:
     """Simple replay buffer storing recent episodes."""
 
-    max_episodes: int = 1000
+    max_episodes: int = 200_000
     data: List[Dict[str, Any]] = field(default_factory=list)
     episodes: deque = field(init=False)
 
