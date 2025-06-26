@@ -50,6 +50,7 @@ def run_mcts(
     num_simulations: int = 20,
     c_puct: float = 1.0,
     predict=None,
+    device: jax.Device | None = None,
 ) -> jnp.ndarray:
     """Run MCTS starting from ``env`` state and return a policy distribution.
 
@@ -59,10 +60,14 @@ def run_mcts(
     times.  If ``predict`` is ``None`` a compiled version is created on the
     first call.
     """
+    if device is None:
+        gpus = jax.devices("gpu")
+        device = gpus[0] if gpus else jax.devices()[0]
+
     root = Node(prior=1.0)
 
     if predict is None:
-        predict = jax.jit(model.apply)
+        predict = jax.jit(model.apply, device=device)
 
     for _ in range(num_simulations):
         sim_env = env.clone()
@@ -82,8 +87,11 @@ def run_mcts(
         if sim_env.done:
             value = math.log(sim_env.score + 1)
         else:
-            board, current, next_tile = state_to_arrays(sim_env.get_state())
+            board, current, next_tile = state_to_arrays(
+                sim_env.get_state(), device=device
+            )
             logits, value_pred = predict(params, board, current, next_tile)
+            logits, value_pred = jax.device_get((logits, value_pred))
             policy = jax.nn.softmax(logits)
             if not node.children:
                 for a in range(5):

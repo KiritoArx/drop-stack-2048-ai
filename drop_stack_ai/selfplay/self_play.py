@@ -22,6 +22,7 @@ def _play_episode(
     params: Dict[str, Any],
     rng: jax.random.PRNGKey,
     *,
+    device: jax.Device | None = None,
     greedy: bool = False,
     greedy_after: int | None = None,
     simulations: int = 20,
@@ -31,7 +32,7 @@ def _play_episode(
 ]:
     """Return data for a single self-play episode."""
     env = DropStackEnv()
-    predict = jax.jit(model.apply)
+    predict = jax.jit(model.apply, device=device)
     states: List[Dict[str, Any]] = []
     policies: List[jnp.ndarray] = []
     values: List[float] = []
@@ -47,6 +48,7 @@ def _play_episode(
             num_simulations=simulations,
             c_puct=c_puct,
             predict=predict,
+            device=device,
         )
 
         use_greedy = greedy or (greedy_after is not None and step >= greedy_after)
@@ -74,6 +76,7 @@ def self_play(
     rng: jax.random.PRNGKey,
     buffer: ReplayBuffer,
     *,
+    device: jax.Device | None = None,
     greedy: bool = False,
     greedy_after: int | None = None,
     simulations: int = 20,
@@ -85,6 +88,7 @@ def self_play(
         model,
         params,
         rng,
+        device=device,
         greedy=greedy,
         greedy_after=greedy_after,
         simulations=simulations,
@@ -95,7 +99,7 @@ def self_play(
     return rng
 
 
-def _worker(args: Tuple[int, bytes, int, str, bool, int | None, int, float]):
+def _worker(args: Tuple[int, bytes, int, str, bool, int | None, int, float, bool]):
     """Helper for ``self_play_parallel`` running in a separate process."""
     (
         seed,
@@ -106,6 +110,7 @@ def _worker(args: Tuple[int, bytes, int, str, bool, int | None, int, float]):
         greedy_after,
         simulations,
         c_puct,
+        use_gpu,
     ) = args
     print(f"[worker] pid={os.getpid()} seed={seed} starting")
     rng = jax.random.PRNGKey(seed)
@@ -116,6 +121,7 @@ def _worker(args: Tuple[int, bytes, int, str, bool, int | None, int, float]):
         model,
         params,
         rng,
+        device=jax.devices("gpu")[0] if use_gpu and jax.devices("gpu") else None,
         greedy=greedy,
         greedy_after=greedy_after,
         simulations=simulations,
@@ -133,6 +139,7 @@ def self_play_parallel(
     *,
     episodes: int,
     processes: int | None = None,
+    use_gpu: bool = False,
     greedy: bool = False,
     greedy_after: int | None = None,
     simulations: int = 20,
@@ -156,29 +163,32 @@ def self_play_parallel(
             greedy_after,
             simulations,
             c_puct,
+            use_gpu,
         )
         for seed in seeds
     ]
 
     ctx = mp.get_context("spawn")
-    # Ensure workers do not consume GPU resources
-    prev_cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES")
-    prev_jax_platform = os.environ.get("JAX_PLATFORM_NAME")
-    os.environ["CUDA_VISIBLE_DEVICES"] = ""
-    os.environ["JAX_PLATFORM_NAME"] = "cpu"
-    print("[self_play_parallel] running workers on CPU")
+    if not use_gpu:
+        # Ensure workers do not consume GPU resources
+        prev_cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+        prev_jax_platform = os.environ.get("JAX_PLATFORM_NAME")
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        os.environ["JAX_PLATFORM_NAME"] = "cpu"
+        print("[self_play_parallel] running workers on CPU")
     try:
         with ctx.Pool(processes) as pool:
             results = pool.map(_worker, args)
     finally:
-        if prev_cuda_visible is None:
-            os.environ.pop("CUDA_VISIBLE_DEVICES", None)
-        else:
-            os.environ["CUDA_VISIBLE_DEVICES"] = prev_cuda_visible
-        if prev_jax_platform is None:
-            os.environ.pop("JAX_PLATFORM_NAME", None)
-        else:
-            os.environ["JAX_PLATFORM_NAME"] = prev_jax_platform
+        if not use_gpu:
+            if prev_cuda_visible is None:
+                os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+            else:
+                os.environ["CUDA_VISIBLE_DEVICES"] = prev_cuda_visible
+            if prev_jax_platform is None:
+                os.environ.pop("JAX_PLATFORM_NAME", None)
+            else:
+                os.environ["JAX_PLATFORM_NAME"] = prev_jax_platform
 
     for states, policies, values in results:
         buffer.add_episode(states, policies, values)
@@ -193,6 +203,7 @@ def launch_self_play_workers(
     buffer: ReplayBuffer,
     *,
     workers: int,
+    use_gpu: bool = False,
     greedy: bool = False,
     greedy_after: int | None = None,
     simulations: int = 20,
@@ -212,6 +223,7 @@ def launch_self_play_workers(
                 buffer,
                 episodes=workers,
                 processes=workers,
+                use_gpu=use_gpu,
                 greedy=greedy,
                 greedy_after=greedy_after,
                 simulations=simulations,
@@ -230,6 +242,7 @@ def launch_self_play_workers_dynamic(
     buffer: ReplayBuffer,
     *,
     workers: int,
+    use_gpu: bool = False,
     greedy: bool = False,
     greedy_after: int | None = None,
     simulations: int = 20,
@@ -242,19 +255,20 @@ def launch_self_play_workers_dynamic(
     def _loop() -> None:
         nonlocal rng
         while not stop_event.is_set():
-            params = get_params()
-            rng = self_play_parallel(
-                model,
-                params,
-                rng,
-                buffer,
-                episodes=workers,
-                processes=workers,
-                greedy=greedy,
-                greedy_after=greedy_after,
-                simulations=simulations,
-                c_puct=c_puct,
-            )
+                params = get_params()
+                rng = self_play_parallel(
+                    model,
+                    params,
+                    rng,
+                    buffer,
+                    episodes=workers,
+                    processes=workers,
+                    use_gpu=use_gpu,
+                    greedy=greedy,
+                    greedy_after=greedy_after,
+                    simulations=simulations,
+                    c_puct=c_puct,
+                )
 
     thread = threading.Thread(target=_loop, daemon=True)
     thread.start()
