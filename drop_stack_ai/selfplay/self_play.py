@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Callable
 
 import math
 
@@ -205,6 +205,44 @@ def launch_self_play_workers(
     def _loop() -> None:
         nonlocal rng
         while not stop_event.is_set():
+            rng = self_play_parallel(
+                model,
+                params,
+                rng,
+                buffer,
+                episodes=workers,
+                processes=workers,
+                greedy=greedy,
+                greedy_after=greedy_after,
+                simulations=simulations,
+                c_puct=c_puct,
+            )
+
+    thread = threading.Thread(target=_loop, daemon=True)
+    thread.start()
+    return stop_event
+
+
+def launch_self_play_workers_dynamic(
+    model: DropStackNet,
+    get_params: Callable[[], Dict[str, Any]],
+    rng: jax.random.PRNGKey,
+    buffer: ReplayBuffer,
+    *,
+    workers: int,
+    greedy: bool = False,
+    greedy_after: int | None = None,
+    simulations: int = 20,
+    c_puct: float = 1.0,
+) -> threading.Event:
+    """Start background workers that fetch params each round."""
+
+    stop_event = threading.Event()
+
+    def _loop() -> None:
+        nonlocal rng
+        while not stop_event.is_set():
+            params = get_params()
             rng = self_play_parallel(
                 model,
                 params,
