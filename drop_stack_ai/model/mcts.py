@@ -49,12 +49,20 @@ def run_mcts(
     *,
     num_simulations: int = 50,
     c_puct: float = 1.0,
+    predict=None,
 ) -> jnp.ndarray:
-    """Run MCTS starting from ``env`` state and return a policy distribution."""
+    """Run MCTS starting from ``env`` state and return a policy distribution.
+
+    The ``predict`` argument should be a JIT compiled version of
+    ``model.apply``. Passing a pre-compiled function avoids recompiling the
+    network on every call which can become costly when MCTS is invoked many
+    times.  If ``predict`` is ``None`` a compiled version is created on the
+    first call.
+    """
     root = Node(prior=1.0)
 
-    # JIT compile the network forward pass for better MCTS performance
-    predict = jax.jit(model.apply)
+    if predict is None:
+        predict = jax.jit(model.apply)
 
     for _ in range(num_simulations):
         sim_env = env.clone()

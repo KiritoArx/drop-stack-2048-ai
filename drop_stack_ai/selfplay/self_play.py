@@ -31,6 +31,7 @@ def _play_episode(
 ]:
     """Return data for a single self-play episode."""
     env = DropStackEnv()
+    predict = jax.jit(model.apply)
     states: List[Dict[str, Any]] = []
     policies: List[jnp.ndarray] = []
     values: List[float] = []
@@ -45,6 +46,7 @@ def _play_episode(
             env,
             num_simulations=simulations,
             c_puct=c_puct,
+            predict=predict,
         )
 
         use_greedy = greedy or (greedy_after is not None and step >= greedy_after)
