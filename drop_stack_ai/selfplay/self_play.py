@@ -24,7 +24,7 @@ def _play_episode(
     *,
     greedy: bool = False,
     greedy_after: int | None = None,
-    simulations: int = 50,
+    simulations: int = 20,
     c_puct: float = 1.0,
 ) -> Tuple[
     jax.random.PRNGKey, List[Dict[str, Any]], List[jnp.ndarray], List[float], int
@@ -76,7 +76,7 @@ def self_play(
     *,
     greedy: bool = False,
     greedy_after: int | None = None,
-    simulations: int = 50,
+    simulations: int = 20,
     c_puct: float = 1.0,
 ) -> jax.random.PRNGKey:
     """Run a single self-play episode using MCTS and store it in ``buffer``."""
@@ -135,7 +135,7 @@ def self_play_parallel(
     processes: int | None = None,
     greedy: bool = False,
     greedy_after: int | None = None,
-    simulations: int = 50,
+    simulations: int = 20,
     c_puct: float = 1.0,
 ) -> jax.random.PRNGKey:
     """Run ``episodes`` self-play games in parallel."""
@@ -195,7 +195,7 @@ def launch_self_play_workers(
     workers: int,
     greedy: bool = False,
     greedy_after: int | None = None,
-    simulations: int = 50,
+    simulations: int = 20,
     c_puct: float = 1.0,
 ) -> threading.Event:
     """Start background self-play workers that continuously fill ``buffer``."""
