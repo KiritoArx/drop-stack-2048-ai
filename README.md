@@ -68,6 +68,11 @@ training step uses a GPU. JAX may report errors such as::
 These messages are harmless and simply indicate that the workers do not have GPU
 access. You can redirect or suppress them if desired.
 
+If you want the workers to evaluate the neural network on a GPU, pass
+``use_gpu=True`` to ``self_play_parallel`` or the worker launch helpers. When
+enabled, the MCTS rollouts keep running on the CPU but the network predictions
+are offloaded to the GPU for better throughput.
+
 ## Asynchronous training
 
 You can keep the GPU busy by generating self-play data while training. Pass the
