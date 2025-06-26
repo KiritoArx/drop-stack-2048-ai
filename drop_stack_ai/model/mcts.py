@@ -47,7 +47,7 @@ def run_mcts(
     params: Dict,
     env: DropStackEnv,
     *,
-    num_simulations: int = 50,
+    num_simulations: int = 20,
     c_puct: float = 1.0,
     predict=None,
 ) -> jnp.ndarray:

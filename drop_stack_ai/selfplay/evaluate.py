@@ -15,7 +15,7 @@ def play_game(
     params: Dict,
     rng: jax.random.PRNGKey,
     *,
-    simulations: int = 50,
+    simulations: int = 20,
     c_puct: float = 1.0,
     predict=None,
 ) -> tuple[jax.random.PRNGKey, int]:
@@ -44,7 +44,7 @@ def evaluate_model(
     *,
     games: int = 50,
     seed: int = 0,
-    simulations: int = 50,
+    simulations: int = 20,
     c_puct: float = 1.0,
 ) -> float:
     """Return the average score over ``games`` greedy self-play episodes."""
