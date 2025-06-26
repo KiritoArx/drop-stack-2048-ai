@@ -17,9 +17,12 @@ def play_game(
     *,
     simulations: int = 50,
     c_puct: float = 1.0,
+    predict=None,
 ) -> tuple[jax.random.PRNGKey, int]:
     """Play a single game greedily and return the score."""
     env = DropStackEnv(seed=int(jax.random.randint(rng, (), 0, 2**31 - 1)))
+    if predict is None:
+        predict = jax.jit(model.apply)
     done = False
     while not done:
         policy = run_mcts(
@@ -28,6 +31,7 @@ def play_game(
             env,
             num_simulations=simulations,
             c_puct=c_puct,
+            predict=predict,
         )
         action = int(jnp.argmax(policy))
         _, _, done = env.step(action)
@@ -45,6 +49,7 @@ def evaluate_model(
 ) -> float:
     """Return the average score over ``games`` greedy self-play episodes."""
     rng = jax.random.PRNGKey(seed)
+    predict = jax.jit(model.apply)
     total = 0.0
     for _ in range(games):
         rng, key = jax.random.split(rng)
@@ -54,6 +59,7 @@ def evaluate_model(
             key,
             simulations=simulations,
             c_puct=c_puct,
+            predict=predict,
         )
         total += score
     return total / games
