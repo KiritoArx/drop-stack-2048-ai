@@ -67,3 +67,11 @@ training step uses a GPU. JAX may report errors such as::
 
 These messages are harmless and simply indicate that the workers do not have GPU
 access. You can redirect or suppress them if desired.
+
+## Asynchronous training
+
+You can keep the GPU busy by generating self-play data while training. Pass the
+`--workers` flag to `main.py` to launch background self-play processes that
+continuously fill the replay buffer. The training loop fetches the latest
+parameters for each batch so the workers automatically use the most recent
+model.

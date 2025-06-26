@@ -32,27 +32,37 @@ def run_cycle(
     if config.checkpoint_path and os.path.exists(config.checkpoint_path):
         print(f"[run_cycle] loading checkpoint from {config.checkpoint_path}")
         params = load_params(config.checkpoint_path, params)
-    buffer = ReplayBuffer()
-    if processes is None or processes > 1:
-        rng = self_play_parallel(
-            model,
-            params,
-            rng,
-            buffer,
-            episodes=episodes,
-            processes=processes,
-            greedy_after=greedy_after,
-        )
-        print(f"[run_cycle] buffer size={len(buffer)} after parallel self-play")
+    buffer = ReplayBuffer(max_episodes=config.buffer_size)
+    if config.workers == 0:
+        if episodes > 0:
+            if processes is None or processes > 1:
+                rng = self_play_parallel(
+                    model,
+                    params,
+                    rng,
+                    buffer,
+                    episodes=episodes,
+                    processes=processes,
+                    greedy_after=greedy_after,
+                )
+                print(
+                    f"[run_cycle] buffer size={len(buffer)} after parallel self-play"
+                )
+            else:
+                for i in range(episodes):
+                    print(f"[run_cycle] self-play episode {i + 1}/{episodes}")
+                    rng = self_play(
+                        model, params, rng, buffer, greedy_after=greedy_after
+                    )
+                    print(
+                        f"[run_cycle] buffer size={len(buffer)} after episode {i + 1}"
+                    )
+        if len(buffer) == 0:
+            raise ValueError("Replay buffer is empty after self-play")
     else:
-        for i in range(episodes):
-            print(f"[run_cycle] self-play episode {i + 1}/{episodes}")
-            rng = self_play(
-                model, params, rng, buffer, greedy_after=greedy_after
-            )
-            print(f"[run_cycle] buffer size={len(buffer)} after episode {i + 1}")
-    if len(buffer) == 0:
-        raise ValueError("Replay buffer is empty after self-play")
+        print(
+            f"[run_cycle] asynchronous mode with {config.workers} workers; episodes arg ignored"
+        )
     print("[run_cycle] starting training")
     train(buffer, seed=seed, config=config)
     print("[run_cycle] training complete")
@@ -110,6 +120,12 @@ def main() -> None:
         default=None,
         help="Number of worker processes for self-play (default: all CPUs)",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=0,
+        help="Background self-play workers during training",
+    )
     args = parser.parse_args()
 
     os.environ.setdefault("JAX_TRACEBACK_FILTERING", "off")
@@ -123,6 +139,7 @@ def main() -> None:
         hidden_size=args.hidden_size,
         checkpoint_path=args.checkpoint,
         mixed_precision=args.mixed_precision,
+        workers=args.workers,
     )
     for cycle in range(args.cycles):
         print(f"[main] starting cycle {cycle + 1}/{args.cycles}")

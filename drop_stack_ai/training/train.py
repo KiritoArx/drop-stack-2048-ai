@@ -22,6 +22,7 @@ from drop_stack_ai.selfplay.self_play import (
     self_play,
     self_play_parallel,
     launch_self_play_workers,
+    launch_self_play_workers_dynamic,
 )
 from .data_loader import data_loader
 from .replay_buffer import ReplayBuffer
@@ -137,19 +138,6 @@ def train(
     if config.mixed_precision:
         jax.config.update("jax_default_matmul_precision", "float16")
 
-    if config.workers > 0:
-        launch_self_play_workers(
-            model,
-            state.params,
-            sp_rng,
-            buffer,
-            workers=config.workers,
-            greedy_after=config.greedy_after,
-        )
-        # Give workers time to populate the buffer
-        while len(buffer) < config.batch_size:
-            time.sleep(0.1)
-
     devices = jax.local_devices()
     n_devices = len(devices)
     print(f"Using {n_devices} device(s) for training")
@@ -167,6 +155,26 @@ def train(
         update_fn = pmap_update_fn(model)
     else:
         update_fn = jax.jit(make_update_fn(model))
+
+    sp_stop = None
+    if config.workers > 0:
+        def _get_params() -> Dict[str, Any]:
+            params = state.params
+            if n_devices > 1:
+                params = jax.tree_util.tree_map(lambda x: x[0], params)
+            return jax.device_get(params)
+
+        sp_stop = launch_self_play_workers_dynamic(
+            model,
+            _get_params,
+            sp_rng,
+            buffer,
+            workers=config.workers,
+            greedy_after=config.greedy_after,
+        )
+        # Give workers time to populate the buffer
+        while len(buffer) < config.batch_size:
+            time.sleep(0.1)
 
     loader = data_loader(buffer, config.batch_size, devices=devices, prefetch=2)
 
@@ -190,6 +198,9 @@ def train(
         params = jax.device_get(params)
         save_params(params, config.checkpoint_path)
         print(f"Saved checkpoint to {config.checkpoint_path}")
+
+    if sp_stop is not None:
+        sp_stop.set()
 
 
 if __name__ == "__main__":
