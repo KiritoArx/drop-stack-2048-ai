@@ -57,6 +57,11 @@ def main() -> None:
     parser.add_argument("--buffer-size", type=int, default=200_000)
     parser.add_argument("--save-every", type=int, default=300)
     parser.add_argument("--steps", type=int, default=1000)
+    parser.add_argument("--scan-every", type=int, default=10, help="Seconds between polling for new data")
+    parser.add_argument("--log-interval", type=int, default=100, help="Steps between metric logs")
+    parser.add_argument("--init-episodes", type=int, default=0, help="Generate this many episodes locally if buffer is empty")
+    parser.add_argument("--processes", type=int, default=1, help="Processes for seeding episodes")
+    parser.add_argument("--greedy-after", type=int, default=10, help="Steps before greedy play during seeding")
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
@@ -84,41 +89,74 @@ def main() -> None:
         update_fn = jax.jit(make_update_fn(model))
 
     buffer = ReplayBuffer(max_episodes=args.buffer_size)
+    if args.init_episodes > 0:
+        print(f"[learner] generating {args.init_episodes} seed episodes")
+        tmp = ReplayBuffer()
+        rng = self_play_parallel(
+            model,
+            state.params,
+            rng,
+            tmp,
+            episodes=args.init_episodes,
+            processes=args.processes,
+            greedy_after=args.greedy_after,
+        )
+        buffer.extend(tmp)
+        print(f"[learner] initial buffer size={len(buffer)}")
     processed: Set[str] = set()
     last_save = time.time()
     loader = data_loader(buffer, args.batch_size, devices=devices, prefetch=2)
 
-    while True:
-        # fetch new episode files
-        for path in list_files(args.data):
-            if path in processed:
+    stop_event = threading.Event()
+
+    def _scan() -> None:
+        while not stop_event.is_set():
+            for path in list_files(args.data):
+                if path in processed:
+                    continue
+                try:
+                    data = load_bytes(path)
+                    new_buf = load_buffer_bytes(data)
+                    buffer.extend(new_buf)
+                    processed.add(path)
+                    print(
+                        f"[learner] loaded data from {path}, buffer size={len(buffer)}"
+                    )
+                except Exception as e:
+                    print(f"[learner] failed to load {path}: {e}")
+            time.sleep(args.scan_every)
+
+    threading.Thread(target=_scan, daemon=True).start()
+
+    step = 0
+    try:
+        while True:
+            if len(buffer) < args.batch_size:
+                time.sleep(0.1)
                 continue
-            try:
-                data = load_bytes(path)
-                new_buf = load_buffer_bytes(data)
-                buffer.extend(new_buf)
-                processed.add(path)
-                print(f"[learner] loaded data from {path}, buffer size={len(buffer)}")
-            except Exception as e:
-                print(f"[learner] failed to load {path}: {e}")
 
-        if len(buffer) < args.batch_size:
-            time.sleep(1)
-            continue
-
-        for _ in range(args.steps):
             batch = next(loader)
             state, metrics = update_fn(state, batch)
+            step += 1
 
-        now = time.time()
-        if now - last_save >= args.save_every:
-            params = state.params
-            if n_devices > 1:
-                params = jax.tree_util.tree_map(lambda x: x[0], params)
-            params = jax.device_get(params)
-            save_params(params, args.model)
-            print(f"[learner] saved model to {args.model}")
-            last_save = now
+            if step % args.log_interval == 0:
+                metrics = jax.tree_util.tree_map(lambda x: float(jnp.mean(x)), metrics)
+                print(
+                    f"step {step}: loss={metrics['loss']:.4f} "
+                    f"policy_loss={metrics['policy_loss']:.4f} value_loss={metrics['value_loss']:.4f}"
+                )
+
+            now = time.time()
+            if now - last_save >= args.save_every:
+                params = state.params
+                if n_devices > 1:
+                    params = jax.tree_util.tree_map(lambda x: x[0], params)
+                params = jax.device_get(params)
+                save_params(params, args.model)
+                print(f"[learner] saved model to {args.model}")
+                last_save = now
+    finally:
+        stop_event.set()
 
 
 if __name__ == "__main__":

@@ -87,5 +87,10 @@ The pipeline can also run as two separate programs. ``actor.py`` repeatedly
 downloads the latest checkpoint, generates a batch of self‑play games and
 uploads the episodes to cloud storage. ``learner.py`` continuously reads these
 episode files, trains the network and periodically writes updated parameters
-back to the same storage location. This decouples data generation from the
-training loop so multiple actors can run in parallel.
+back to the same storage location. The learner now watches the episode
+directory in a background thread so new data is incorporated immediately while
+training continues. You can control the polling rate with ``--scan-every`` and
+log progress every ``--log-interval`` steps. The ``--init-episodes`` option
+seeds the replay buffer by running a bit of self-play locally before training
+begins. This decouples data generation from the training loop so multiple actors
+can run in parallel.
