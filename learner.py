@@ -1,0 +1,125 @@
+import argparse
+import os
+import pickle
+import time
+from typing import Set
+
+import jax
+import jax.numpy as jnp
+
+from drop_stack_ai.utils.device_info import print_device_info
+from drop_stack_ai.model.network import DropStackNet, create_model
+from drop_stack_ai.training.train import (
+    TrainConfig,
+    make_update_fn,
+    pmap_update_fn,
+    create_train_state,
+)
+from drop_stack_ai.training.data_loader import data_loader
+from drop_stack_ai.training.replay_buffer import ReplayBuffer
+from drop_stack_ai.utils.serialization import (
+    load_params,
+    save_params,
+    load_bytes,
+)
+from google.cloud import storage
+
+
+def load_buffer_bytes(data: bytes) -> ReplayBuffer:
+    obj = pickle.loads(data)
+    if isinstance(obj, ReplayBuffer):
+        return obj
+    if isinstance(obj, list):
+        return ReplayBuffer(data=obj)
+    raise TypeError("Unrecognized buffer format")
+
+
+def list_files(path: str) -> list[str]:
+    if path.startswith("gs://"):
+        bucket, prefix = path[5:].split("/", 1)
+        client = storage.Client()
+        return [
+            f"gs://{bucket}/{blob.name}"
+            for blob in client.list_blobs(bucket, prefix=prefix)
+        ]
+    else:
+        return [os.path.join(path, f) for f in os.listdir(path)]
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Learner")
+    parser.add_argument("--data", type=str, required=True, help="Episode file directory or gs:// bucket")
+    parser.add_argument("--model", type=str, required=True, help="Path to save model parameters")
+    parser.add_argument("--hidden-size", type=int, default=1024)
+    parser.add_argument("--mixed-precision", action="store_true")
+    parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--learning-rate", type=float, default=2e-3)
+    parser.add_argument("--buffer-size", type=int, default=200_000)
+    parser.add_argument("--save-every", type=int, default=300)
+    parser.add_argument("--steps", type=int, default=1000)
+    parser.add_argument("--seed", type=int, default=0)
+    args = parser.parse_args()
+
+    os.environ.setdefault("JAX_TRACEBACK_FILTERING", "off")
+    print_device_info()
+
+    rng = jax.random.PRNGKey(args.seed)
+    config = TrainConfig(
+        batch_size=args.batch_size,
+        steps=args.steps,
+        learning_rate=args.learning_rate,
+        hidden_size=args.hidden_size,
+        checkpoint_path=args.model,
+        buffer_size=args.buffer_size,
+        mixed_precision=args.mixed_precision,
+    )
+    state, model = create_train_state(rng, config)
+
+    devices = jax.local_devices()
+    n_devices = len(devices)
+    if n_devices > 1:
+        state = jax.device_put_replicated(state, devices)
+        update_fn = pmap_update_fn(model)
+    else:
+        update_fn = jax.jit(make_update_fn(model))
+
+    buffer = ReplayBuffer(max_episodes=args.buffer_size)
+    processed: Set[str] = set()
+    last_save = time.time()
+    loader = data_loader(buffer, args.batch_size, devices=devices, prefetch=2)
+
+    while True:
+        # fetch new episode files
+        for path in list_files(args.data):
+            if path in processed:
+                continue
+            try:
+                data = load_bytes(path)
+                new_buf = load_buffer_bytes(data)
+                buffer.extend(new_buf)
+                processed.add(path)
+                print(f"[learner] loaded data from {path}, buffer size={len(buffer)}")
+            except Exception as e:
+                print(f"[learner] failed to load {path}: {e}")
+
+        if len(buffer) < args.batch_size:
+            time.sleep(1)
+            continue
+
+        for _ in range(args.steps):
+            batch = next(loader)
+            state, metrics = update_fn(state, batch)
+
+        now = time.time()
+        if now - last_save >= args.save_every:
+            params = state.params
+            if n_devices > 1:
+                params = jax.tree_util.tree_map(lambda x: x[0], params)
+            params = jax.device_get(params)
+            save_params(params, args.model)
+            print(f"[learner] saved model to {args.model}")
+            last_save = now
+
+
+if __name__ == "__main__":
+    main()

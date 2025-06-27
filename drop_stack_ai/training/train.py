@@ -27,6 +27,8 @@ from drop_stack_ai.selfplay.self_play import (
 from .data_loader import data_loader
 from .replay_buffer import ReplayBuffer
 from drop_stack_ai.utils.serialization import load_params, save_params
+from drop_stack_ai.utils.serialization import load_bytes
+from google.cloud import storage
 
 
 
@@ -67,9 +69,18 @@ def create_train_state(
 ) -> train_state.TrainState:
     dtype = jnp.float16 if config.mixed_precision else jnp.float32
     model, params = create_model(rng, hidden_size=config.hidden_size, dtype=dtype)
-    if config.checkpoint_path and os.path.exists(config.checkpoint_path):
-        print(f"Loading checkpoint from {config.checkpoint_path}")
-        params = load_params(config.checkpoint_path, params)
+    if config.checkpoint_path:
+        exists = False
+        if config.checkpoint_path.startswith("gs://"):
+            bucket, blob_name = config.checkpoint_path[5:].split("/", 1)
+            client = storage.Client()
+            blob = client.bucket(bucket).blob(blob_name)
+            exists = blob.exists()
+        else:
+            exists = os.path.exists(config.checkpoint_path)
+        if exists:
+            print(f"Loading checkpoint from {config.checkpoint_path}")
+            params = load_params(config.checkpoint_path, params)
     tx = optax.adam(config.learning_rate)
     return (
         train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx),

@@ -45,3 +45,11 @@ class ReplayBuffer:
         import random
 
         return random.sample(self.data, batch_size)
+
+    def extend(self, other: "ReplayBuffer") -> None:
+        """Append all episodes from ``other`` into this buffer."""
+        for episode in other.episodes:
+            states = [item["state"] for item in episode]
+            policies = [item["policy"] for item in episode]
+            values = [item["value"] for item in episode]
+            self.add_episode(states, policies, values)

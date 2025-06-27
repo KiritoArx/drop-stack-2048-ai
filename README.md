@@ -80,3 +80,12 @@ You can keep the GPU busy by generating self-play data while training. Pass the
 continuously fill the replay buffer. The training loop fetches the latest
 parameters for each batch so the workers automatically use the most recent
 model.
+
+## Actor/Learner setup
+
+The pipeline can also run as two separate programs. ``actor.py`` repeatedly
+downloads the latest checkpoint, generates a batch of self‑play games and
+uploads the episodes to cloud storage. ``learner.py`` continuously reads these
+episode files, trains the network and periodically writes updated parameters
+back to the same storage location. This decouples data generation from the
+training loop so multiple actors can run in parallel.
