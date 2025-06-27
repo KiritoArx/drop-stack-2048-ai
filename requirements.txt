@@ -3,3 +3,4 @@ jax[cuda12]
 flax
 optax
 pybind11>=2.11.1
+google-cloud-storage
