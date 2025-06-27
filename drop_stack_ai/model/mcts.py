@@ -61,8 +61,11 @@ def run_mcts(
     first call.
     """
     if device is None:
-        gpus = jax.devices("gpu")
-        device = gpus[0] if gpus else jax.devices()[0]
+        try:
+            gpus = jax.devices("gpu")
+        except RuntimeError:
+            gpus = []
+        device = gpus[0] if gpus else jax.devices("cpu")[0]
 
     root = Node(prior=1.0)
 
