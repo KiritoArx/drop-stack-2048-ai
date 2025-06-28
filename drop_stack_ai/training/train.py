@@ -63,6 +63,7 @@ class TrainConfig:
     buffer_size: int = 200_000
     greedy_after: int | None = 10
     mixed_precision: bool = False
+    upload_path: Optional[str] = None
 
 
 def create_train_state(
@@ -211,6 +212,9 @@ def train(
         params = jax.device_get(params)
         save_params(params, config.checkpoint_path)
         print(f"Saved checkpoint to {config.checkpoint_path}")
+        if config.upload_path:
+            save_params(params, config.upload_path)
+            print(f"Uploaded checkpoint to {config.upload_path}")
 
     if sp_stop is not None:
         sp_stop.set()
@@ -270,6 +274,12 @@ if __name__ == "__main__":
         default=os.path.join("checkpoints", "model.msgpack"),
         help="Path to save or load model parameters",
     )
+    parser.add_argument(
+        "--upload",
+        type=str,
+        default=None,
+        help="Optional gs:// path to upload the final model",
+    )
     parser.add_argument("--seed", type=int, default=0, help="PRNG seed")
     args = parser.parse_args()
 
@@ -312,5 +322,6 @@ if __name__ == "__main__":
         buffer_size=args.buffer_size,
         greedy_after=args.greedy_after,
         mixed_precision=args.mixed_precision,
+        upload_path=args.upload,
     )
     train(buffer, seed=args.seed, config=config)

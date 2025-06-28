@@ -48,3 +48,24 @@ def load_bytes(path: str) -> bytes:
 def save_bytes(data: bytes, path: str) -> None:
     """Write raw bytes to ``path`` which may be local or ``gs://``."""
     _write_bytes(path, data)
+
+
+def upload_file(local_path: str, gcs_path: str) -> None:
+    """Upload ``local_path`` to ``gcs_path`` using Google Cloud Storage."""
+    if not os.path.exists(local_path):
+        raise FileNotFoundError(local_path)
+    if not gcs_path.startswith("gs://"):
+        raise ValueError("Destination must be a gs:// path")
+    bucket, blob_name = gcs_path[5:].split("/", 1)
+    client = storage.Client()
+    client.bucket(bucket).blob(blob_name).upload_from_filename(local_path)
+
+
+def download_file(gcs_path: str, local_path: str) -> None:
+    """Download ``gcs_path`` to ``local_path`` using Google Cloud Storage."""
+    if not gcs_path.startswith("gs://"):
+        raise ValueError("Source must be a gs:// path")
+    bucket, blob_name = gcs_path[5:].split("/", 1)
+    client = storage.Client()
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    client.bucket(bucket).blob(blob_name).download_to_filename(local_path)
