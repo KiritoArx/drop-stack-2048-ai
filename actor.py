@@ -3,6 +3,8 @@ import os
 import pickle
 import time
 
+os.environ.setdefault("JAX_PLATFORM_NAME", "gpu")
+
 import jax
 import jax.numpy as jnp
 

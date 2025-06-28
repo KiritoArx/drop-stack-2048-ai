@@ -3,6 +3,8 @@ import os
 import pickle
 import time
 import threading
+
+os.environ.setdefault("JAX_PLATFORM_NAME", "gpu")
 from typing import Set
 from concurrent.futures import ThreadPoolExecutor
 
@@ -69,7 +71,7 @@ def main() -> None:
     )
     parser.add_argument("--hidden-size", type=int, default=1024)
     parser.add_argument("--mixed-precision", action="store_true")
-    parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--learning-rate", type=float, default=2e-3)
     parser.add_argument("--buffer-size", type=int, default=200_000)
     parser.add_argument("--save-every", type=int, default=300)
@@ -169,7 +171,7 @@ def main() -> None:
     step = 0
     try:
         while True:
-            if len(buffer) < args.batch_size:
+            if len(buffer) == 0:
                 time.sleep(0.1)
                 continue
 
