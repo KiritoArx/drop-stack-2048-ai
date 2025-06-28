@@ -94,6 +94,10 @@ log progress every ``--log-interval`` steps. The ``--init-episodes`` option
 seeds the replay buffer by running a bit of self-play locally before training
 begins. This decouples data generation from the training loop so multiple actors
 can run in parallel.
+Episodes are bundled into larger files by ``actor.py`` using the
+``--episodes-per-file`` option for more efficient uploads. ``learner.py``
+polls cloud storage with exponential backoff and downloads files in parallel via
+``--download-workers``.
 
 Both scripts default to using the ``gs://drop-stack-ai-data-12345`` bucket for
 models and episode files. Simply running ``python learner.py`` and
