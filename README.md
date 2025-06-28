@@ -99,6 +99,11 @@ Episodes are bundled into larger files by ``actor.py`` using the
 polls cloud storage with exponential backoff and downloads files in parallel via
 ``--download-workers``.
 
+The learner now writes an additional ``model_latest.msgpack`` checkpoint to
+cloud storage using the ``--latest-model`` flag. Actors periodically check for
+updates (configurable via ``--refresh-every``) and reload the newest model
+before generating self-play games.
+
 Both scripts default to using the ``gs://drop-stack-ai-data-12345`` bucket for
 models and episode files. Simply running ``python learner.py`` and
 ``python actor.py`` will therefore train and generate data using that bucket.

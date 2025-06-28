@@ -54,6 +54,12 @@ def main() -> None:
     parser.add_argument("--mixed-precision", action="store_true", help="Use float16 model")
     parser.add_argument("--greedy-after", type=int, default=10, help="Moves before greedy play")
     parser.add_argument("--sleep", type=int, default=30, help="Pause between batches (seconds)")
+    parser.add_argument(
+        "--refresh-every",
+        type=int,
+        default=60,
+        help="Seconds between checks for a new model",
+    )
     parser.add_argument("--seed", type=int, default=0, help="PRNG seed")
     args = parser.parse_args()
 
@@ -64,25 +70,29 @@ def main() -> None:
     last_stamp = None
     batch_buffer = ReplayBuffer()
 
+    last_check = 0.0
     while True:
-        # Reload model if file changed
-        try:
-            if args.model.startswith("gs://"):
-                from google.cloud import storage
+        now = time.time()
+        if now - last_check >= args.refresh_every:
+            last_check = now
+            # Reload model if file changed
+            try:
+                if args.model.startswith("gs://"):
+                    from google.cloud import storage
 
-                bucket, blob_name = args.model[5:].split("/", 1)
-                client = storage.Client()
-                blob = client.bucket(bucket).blob(blob_name)
-                blob.reload()
-                stamp = blob.updated
-            else:
-                stamp = os.path.getmtime(args.model)
-        except Exception:
-            stamp = None
-        if stamp != last_stamp:
-            last_stamp = stamp
-            params = load_model(args.model, model, params)
-            print("[actor] loaded new model")
+                    bucket, blob_name = args.model[5:].split("/", 1)
+                    client = storage.Client()
+                    blob = client.bucket(bucket).blob(blob_name)
+                    blob.reload()
+                    stamp = blob.updated
+                else:
+                    stamp = os.path.getmtime(args.model)
+            except Exception:
+                stamp = None
+            if stamp != last_stamp:
+                last_stamp = stamp
+                params = load_model(args.model, model, params)
+                print("[actor] loaded new model")
 
         buffer = ReplayBuffer()
         rng = self_play_parallel(

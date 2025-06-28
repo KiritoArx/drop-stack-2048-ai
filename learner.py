@@ -31,6 +31,7 @@ from google.cloud import storage
 
 DEFAULT_BUCKET = os.environ.get("DROPSTACK_BUCKET", "gs://drop-stack-ai-data-12345")
 DEFAULT_MODEL = os.path.join(DEFAULT_BUCKET, "checkpoints", "model.msgpack")
+DEFAULT_LATEST = os.path.join(DEFAULT_BUCKET, "checkpoints", "model_latest.msgpack")
 DEFAULT_EPISODES = os.path.join(DEFAULT_BUCKET, "episodes")
 
 
@@ -68,6 +69,12 @@ def main() -> None:
         type=str,
         default=DEFAULT_MODEL,
         help="Path to save model parameters",
+    )
+    parser.add_argument(
+        "--latest-model",
+        type=str,
+        default=DEFAULT_LATEST,
+        help="gs:// path for the continuously updated model",
     )
     parser.add_argument("--hidden-size", type=int, default=1024)
     parser.add_argument("--mixed-precision", action="store_true")
@@ -108,6 +115,7 @@ def main() -> None:
         checkpoint_path=args.model,
         buffer_size=args.buffer_size,
         mixed_precision=args.mixed_precision,
+        upload_path=args.latest_model,
     )
     state, model = create_train_state(rng, config)
 
@@ -194,6 +202,9 @@ def main() -> None:
                 params = jax.device_get(params)
                 save_params(params, args.model)
                 print(f"[learner] saved model to {args.model}")
+                if args.latest_model:
+                    save_params(params, args.latest_model)
+                    print(f"[learner] uploaded model to {args.latest_model}")
                 last_save = now
     finally:
         stop_event.set()
