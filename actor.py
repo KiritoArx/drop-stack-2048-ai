@@ -3,7 +3,9 @@ import os
 import pickle
 import time
 
-os.environ.setdefault("JAX_PLATFORM_NAME", "gpu")
+# Force CPU-only usage regardless of system configuration
+os.environ["JAX_PLATFORM_NAME"] = "cpu"
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 import jax
 import jax.numpy as jnp
