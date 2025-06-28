@@ -69,7 +69,7 @@ def data_loader(
 
     def _iterator() -> Iterator[Dict[str, jnp.ndarray]]:
         while True:
-            while len(buffer) < batch_size:
+            while len(buffer) == 0:
                 time.sleep(0.01)
             samples = buffer.sample(batch_size)
             batch = _prepare_batch(samples)

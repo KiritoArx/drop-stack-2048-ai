@@ -1,6 +1,8 @@
 import os
 import argparse
 
+os.environ.setdefault("JAX_PLATFORM_NAME", "gpu")
+
 import jax
 import jax.numpy as jnp
 
@@ -92,7 +94,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run Drop Stack 2048 training cycle")
     parser.add_argument("--episodes", type=int, default=20000, help="Number of self-play episodes")
     parser.add_argument("--steps", type=int, default=100000, help="Training steps")
-    parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
+    parser.add_argument("--batch-size", type=int, default=512, help="Batch size")
     parser.add_argument("--learning-rate", type=float, default=2e-3, help="Learning rate")
     parser.add_argument("--hidden-size", type=int, default=1024, help="Model hidden size")
     parser.add_argument(

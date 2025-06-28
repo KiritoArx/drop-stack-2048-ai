@@ -44,7 +44,9 @@ class ReplayBuffer:
         """Randomly sample ``batch_size`` elements from the buffer."""
         import random
 
-        return random.sample(self.data, batch_size)
+        if len(self.data) >= batch_size:
+            return random.sample(self.data, batch_size)
+        return random.choices(self.data, k=batch_size)
 
     def extend(self, other: "ReplayBuffer") -> None:
         """Append all episodes from ``other`` into this buffer."""

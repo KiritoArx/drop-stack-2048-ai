@@ -8,6 +8,7 @@ import argparse
 import pickle
 import time
 
+os.environ.setdefault("JAX_PLATFORM_NAME", "gpu")
 os.environ.setdefault("JAX_TRACEBACK_FILTERING", "off")
 
 import jax
@@ -52,7 +53,7 @@ def load_buffer(path: str) -> ReplayBuffer:
 
 @dataclass
 class TrainConfig:
-    batch_size: int = 256
+    batch_size: int = 512
     steps: int = 100_000
     learning_rate: float = 2e-3
     hidden_size: int = 1024
@@ -184,7 +185,8 @@ def train(
             greedy_after=config.greedy_after,
         )
         # Give workers time to populate the buffer
-        while len(buffer) < config.batch_size:
+        min_size = max(1, config.batch_size // 4)
+        while len(buffer) < min_size:
             time.sleep(0.1)
 
     loader = data_loader(buffer, config.batch_size, devices=devices, prefetch=2)
@@ -250,7 +252,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--steps", type=int, default=100_000, help="Number of training steps"
     )
-    parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
+    parser.add_argument("--batch-size", type=int, default=512, help="Batch size")
     parser.add_argument(
         "--learning-rate", type=float, default=2e-3, help="Learning rate"
     )
