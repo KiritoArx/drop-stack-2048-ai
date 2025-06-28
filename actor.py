@@ -44,30 +44,54 @@ def main() -> None:
         default=DEFAULT_EPISODES,
         help="Directory or gs:// bucket for episodes",
     )
-    parser.add_argument("--episodes", type=int, default=50, help="Episodes per batch")
+    parser.add_argument(
+        "--episodes",
+        type=int,
+        default=5000,
+        help="Episodes per self-play batch",
+    )
     parser.add_argument(
         "--episodes-per-file",
         type=int,
-        default=200,
-        help="Number of episodes to bundle into each uploaded file",
+        default=20000,
+        help="Number of episodes per uploaded file",
     )
     parser.add_argument(
         "--processes",
         type=int,
-        default=os.cpu_count(),
-        help="Parallel self-play processes (defaults to all CPU cores)",
+        default=os.cpu_count() - 2,
+        help="Parallel self-play processes (all cores minus two)",
     )
-    parser.add_argument("--hidden-size", type=int, default=1024, help="Model hidden size")
-    parser.add_argument("--mixed-precision", action="store_true", help="Use float16 model")
-    parser.add_argument("--greedy-after", type=int, default=10, help="Moves before greedy play")
-    parser.add_argument("--sleep", type=int, default=30, help="Pause between batches (seconds)")
+    parser.add_argument(
+        "--hidden-size",
+        type=int,
+        default=1024,
+        help="Model hidden size (match learner)",
+    )
+    parser.add_argument(
+        "--mixed-precision",
+        action="store_true",
+        help="Use float16 precision (only if learner uses fp16)",
+    )
+    parser.add_argument(
+        "--greedy-after",
+        type=int,
+        default=15,
+        help="Moves before greedy play (fine-tune exploration)",
+    )
+    parser.add_argument(
+        "--sleep",
+        type=int,
+        default=0,
+        help="Pause between batches (seconds)",
+    )
     parser.add_argument(
         "--refresh-every",
         type=int,
-        default=60,
+        default=30,
         help="Seconds between checks for a new model",
     )
-    parser.add_argument("--seed", type=int, default=0, help="PRNG seed")
+    parser.add_argument("--seed", type=int, default=42, help="PRNG seed")
     args = parser.parse_args()
 
     rng = jax.random.PRNGKey(args.seed)
