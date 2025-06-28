@@ -2,7 +2,9 @@ import argparse
 import os
 import pickle
 import time
+import threading
 from typing import Set
+from concurrent.futures import ThreadPoolExecutor
 
 import jax
 import jax.numpy as jnp
@@ -73,6 +75,18 @@ def main() -> None:
     parser.add_argument("--save-every", type=int, default=300)
     parser.add_argument("--steps", type=int, default=1000)
     parser.add_argument("--scan-every", type=int, default=10, help="Seconds between polling for new data")
+    parser.add_argument(
+        "--max-scan-interval",
+        type=int,
+        default=300,
+        help="Maximum backoff interval when polling GCS",
+    )
+    parser.add_argument(
+        "--download-workers",
+        type=int,
+        default=4,
+        help="Parallel download threads for episode files",
+    )
     parser.add_argument("--log-interval", type=int, default=100, help="Steps between metric logs")
     parser.add_argument("--init-episodes", type=int, default=0, help="Generate this many episodes locally if buffer is empty")
     parser.add_argument("--processes", type=int, default=1, help="Processes for seeding episodes")
@@ -125,21 +139,30 @@ def main() -> None:
     stop_event = threading.Event()
 
     def _scan() -> None:
-        while not stop_event.is_set():
-            for path in list_files(args.data):
-                if path in processed:
-                    continue
-                try:
-                    data = load_bytes(path)
-                    new_buf = load_buffer_bytes(data)
-                    buffer.extend(new_buf)
-                    processed.add(path)
-                    print(
-                        f"[learner] loaded data from {path}, buffer size={len(buffer)}"
-                    )
-                except Exception as e:
-                    print(f"[learner] failed to load {path}: {e}")
-            time.sleep(args.scan_every)
+        interval = args.scan_every
+        is_gcs = args.data.startswith("gs://")
+        with ThreadPoolExecutor(max_workers=args.download_workers) as executor:
+            while not stop_event.is_set():
+                paths = [p for p in list_files(args.data) if p not in processed]
+                if paths:
+                    futures = {executor.submit(load_bytes, p): p for p in paths}
+                    for fut in futures:
+                        path = futures[fut]
+                        try:
+                            data = fut.result()
+                            new_buf = load_buffer_bytes(data)
+                            buffer.extend(new_buf)
+                            processed.add(path)
+                            print(
+                                f"[learner] loaded data from {path}, buffer size={len(buffer)}"
+                            )
+                        except Exception as e:
+                            print(f"[learner] failed to load {path}: {e}")
+                    interval = args.scan_every
+                else:
+                    if is_gcs:
+                        interval = min(interval * 2, args.max_scan_interval)
+                time.sleep(interval)
 
     threading.Thread(target=_scan, daemon=True).start()
 

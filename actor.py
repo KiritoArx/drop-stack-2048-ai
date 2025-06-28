@@ -41,6 +41,12 @@ def main() -> None:
         help="Directory or gs:// bucket for episodes",
     )
     parser.add_argument("--episodes", type=int, default=50, help="Episodes per batch")
+    parser.add_argument(
+        "--episodes-per-file",
+        type=int,
+        default=200,
+        help="Number of episodes to bundle into each uploaded file",
+    )
     parser.add_argument("--processes", type=int, default=None, help="Parallel self-play processes")
     parser.add_argument("--hidden-size", type=int, default=1024, help="Model hidden size")
     parser.add_argument("--mixed-precision", action="store_true", help="Use float16 model")
@@ -54,6 +60,7 @@ def main() -> None:
     model, params = create_model(rng, hidden_size=args.hidden_size, dtype=dtype)
     params = load_model(args.model, model, params)
     last_stamp = None
+    batch_buffer = ReplayBuffer()
 
     while True:
         # Reload model if file changed
@@ -85,11 +92,16 @@ def main() -> None:
             processes=args.processes,
             greedy_after=args.greedy_after,
         )
-        payload = pickle.dumps(buffer)
-        filename = f"episodes_{int(time.time())}.pkl"
-        out_path = os.path.join(args.output, filename)
-        save_bytes(payload, out_path)
-        print(f"[actor] saved {len(buffer)} steps to {out_path}")
+        batch_buffer.extend(buffer)
+        if len(batch_buffer.episodes) >= args.episodes_per_file:
+            payload = pickle.dumps(batch_buffer)
+            filename = f"episodes_{int(time.time())}.pkl"
+            out_path = os.path.join(args.output, filename)
+            save_bytes(payload, out_path)
+            print(
+                f"[actor] uploaded {len(batch_buffer.episodes)} episodes to {out_path}"
+            )
+            batch_buffer = ReplayBuffer()
         if args.sleep:
             time.sleep(args.sleep)
 
