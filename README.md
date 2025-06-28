@@ -18,7 +18,8 @@ background thread so the GPU remains busy. Mixed precision can be enabled with
 the `--mixed-precision` flag to reduce memory usage and speed up training.
 
 You can speed up data generation by running multiple self-play episodes in
-parallel using the `--processes` option.
+parallel using the `--processes` option. If not specified, `actor.py` uses the
+number of CPU cores so all available processors participate.
 
 After each training cycle the new model plays a set of test games to measure
 its average score. If this score beats the previous best, the checkpoint is

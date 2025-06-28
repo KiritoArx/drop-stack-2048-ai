@@ -51,7 +51,12 @@ def main() -> None:
         default=200,
         help="Number of episodes to bundle into each uploaded file",
     )
-    parser.add_argument("--processes", type=int, default=None, help="Parallel self-play processes")
+    parser.add_argument(
+        "--processes",
+        type=int,
+        default=os.cpu_count(),
+        help="Parallel self-play processes (defaults to all CPU cores)",
+    )
     parser.add_argument("--hidden-size", type=int, default=1024, help="Model hidden size")
     parser.add_argument("--mixed-precision", action="store_true", help="Use float16 model")
     parser.add_argument("--greedy-after", type=int, default=10, help="Moves before greedy play")
@@ -103,7 +108,7 @@ def main() -> None:
             rng,
             buffer,
             episodes=args.episodes,
-            processes=args.processes,
+            processes=args.processes or os.cpu_count(),
             greedy_after=args.greedy_after,
         )
         batch_buffer.extend(buffer)
