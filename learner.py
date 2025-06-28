@@ -5,8 +5,16 @@ import time
 import threading
 
 os.environ.setdefault("JAX_PLATFORM_NAME", "gpu")
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.90")
+os.environ.setdefault(
+    "XLA_FLAGS",
+    "--xla_gpu_autotune_level=2 "
+    "--xla_cpu_multi_thread_eigen=false,intra_op_parallelism_threads=16",
+)
 from typing import Set
 from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
 
 import jax
 import jax.numpy as jnp
@@ -56,6 +64,20 @@ def list_files(path: str) -> list[str]:
         return [os.path.join(path, f) for f in os.listdir(path)]
 
 
+def make_fused_update(update_fn, n_steps: int):
+    @jax.jit
+    def fused(state, loader):
+        def body(s, _):
+            batch = next(loader)
+            s, _ = update_fn(s, batch)
+            return s, None
+
+        state, _ = jax.lax.scan(body, state, None, length=n_steps)
+        return state
+
+    return fused
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Learner")
     parser.add_argument(
@@ -78,25 +100,32 @@ def main() -> None:
     )
     parser.add_argument("--hidden-size", type=int, default=1024)
     parser.add_argument("--mixed-precision", action="store_true")
-    parser.add_argument("--batch-size", type=int, default=512)
-    parser.add_argument("--learning-rate", type=float, default=2e-3)
-    parser.add_argument("--buffer-size", type=int, default=200_000)
-    parser.add_argument("--save-every", type=int, default=300)
-    parser.add_argument("--steps", type=int, default=1000)
-    parser.add_argument("--scan-every", type=int, default=10, help="Seconds between polling for new data")
+    parser.add_argument("--batch-size", type=int, default=2048,
+                        help="Maximizes GPU usage.")
+    parser.add_argument("--learning-rate", type=float, default=1e-3,
+                        help="More stable for large batches.")
+    parser.add_argument("--buffer-size", type=int, default=500_000,
+                        help="Keeps richer replay data available.")
+    parser.add_argument("--save-every", type=int, default=1000,
+                        help="Checkpoint every 1000 steps.")
+    parser.add_argument("--steps", type=int, default=10000,
+                        help="Fewer interruptions, longer training cycles.")
+    parser.add_argument("--scan-every", type=int, default=10,
+                        help="Frequent scanning for new episodes.")
     parser.add_argument(
         "--max-scan-interval",
         type=int,
-        default=300,
-        help="Maximum backoff interval when polling GCS",
+        default=60,
+        help="Quickly detect newly uploaded data.",
     )
     parser.add_argument(
         "--download-workers",
         type=int,
-        default=4,
-        help="Parallel download threads for episode files",
+        default=8,
+        help="Parallel downloads for episodes.",
     )
-    parser.add_argument("--log-interval", type=int, default=100, help="Steps between metric logs")
+    parser.add_argument("--log-interval", type=int, default=200,
+                        help="Reduce logging overhead.")
     parser.add_argument("--init-episodes", type=int, default=0, help="Generate this many episodes locally if buffer is empty")
     parser.add_argument("--processes", type=int, default=1, help="Processes for seeding episodes")
     parser.add_argument("--greedy-after", type=int, default=10, help="Steps before greedy play during seeding")
@@ -127,6 +156,9 @@ def main() -> None:
     else:
         update_fn = jax.jit(make_update_fn(model))
 
+    fused_steps = int(os.getenv("FUSED_STEPS", "8"))
+    update_fn = make_fused_update(update_fn, fused_steps)
+
     buffer = ReplayBuffer(max_episodes=args.buffer_size)
     if args.init_episodes > 0:
         print(f"[learner] generating {args.init_episodes} seed episodes")
@@ -147,10 +179,9 @@ def main() -> None:
     loader = data_loader(buffer, args.batch_size, devices=devices, prefetch=2)
 
     stop_event = threading.Event()
+    episode_q: Queue = Queue(maxsize=16)
 
     def _scan() -> None:
-        interval = args.scan_every
-        is_gcs = args.data.startswith("gs://")
         with ThreadPoolExecutor(max_workers=args.download_workers) as executor:
             while not stop_event.is_set():
                 paths = [p for p in list_files(args.data) if p not in processed]
@@ -161,24 +192,20 @@ def main() -> None:
                         try:
                             data = fut.result()
                             new_buf = load_buffer_bytes(data)
-                            buffer.extend(new_buf)
+                            episode_q.put(new_buf)
                             processed.add(path)
-                            print(
-                                f"[learner] loaded data from {path}, buffer size={len(buffer)}"
-                            )
                         except Exception as e:
                             print(f"[learner] failed to load {path}: {e}")
-                    interval = args.scan_every
-                else:
-                    if is_gcs:
-                        interval = min(interval * 2, args.max_scan_interval)
-                time.sleep(interval)
+                time.sleep(args.scan_every)
 
     threading.Thread(target=_scan, daemon=True).start()
 
     step = 0
     try:
         while True:
+            while not episode_q.empty():
+                buffer.extend(episode_q.get())
+
             if len(buffer) == 0:
                 time.sleep(0.1)
                 continue
