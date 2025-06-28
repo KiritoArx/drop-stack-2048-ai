@@ -25,6 +25,11 @@ from drop_stack_ai.utils.serialization import (
 from google.cloud import storage
 
 
+DEFAULT_BUCKET = os.environ.get("DROPSTACK_BUCKET", "gs://drop-stack-ai-data-12345")
+DEFAULT_MODEL = os.path.join(DEFAULT_BUCKET, "checkpoints", "model.msgpack")
+DEFAULT_EPISODES = os.path.join(DEFAULT_BUCKET, "episodes")
+
+
 def load_buffer_bytes(data: bytes) -> ReplayBuffer:
     obj = pickle.loads(data)
     if isinstance(obj, ReplayBuffer):
@@ -48,8 +53,18 @@ def list_files(path: str) -> list[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Learner")
-    parser.add_argument("--data", type=str, required=True, help="Episode file directory or gs:// bucket")
-    parser.add_argument("--model", type=str, required=True, help="Path to save model parameters")
+    parser.add_argument(
+        "--data",
+        type=str,
+        default=DEFAULT_EPISODES,
+        help="Episode file directory or gs:// bucket",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_MODEL,
+        help="Path to save model parameters",
+    )
     parser.add_argument("--hidden-size", type=int, default=1024)
     parser.add_argument("--mixed-precision", action="store_true")
     parser.add_argument("--batch-size", type=int, default=256)

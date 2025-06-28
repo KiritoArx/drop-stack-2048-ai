@@ -21,10 +21,25 @@ def load_model(model_path: str, model, params):
         return params
 
 
+DEFAULT_BUCKET = os.environ.get("DROPSTACK_BUCKET", "gs://drop-stack-ai-data-12345")
+DEFAULT_MODEL = os.path.join(DEFAULT_BUCKET, "checkpoints", "model.msgpack")
+DEFAULT_EPISODES = os.path.join(DEFAULT_BUCKET, "episodes")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Self-play actor")
-    parser.add_argument("--model", type=str, required=True, help="Path to model parameters")
-    parser.add_argument("--output", type=str, required=True, help="Directory or gs:// bucket for episodes")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_MODEL,
+        help="Path to model parameters",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=DEFAULT_EPISODES,
+        help="Directory or gs:// bucket for episodes",
+    )
     parser.add_argument("--episodes", type=int, default=50, help="Episodes per batch")
     parser.add_argument("--processes", type=int, default=None, help="Parallel self-play processes")
     parser.add_argument("--hidden-size", type=int, default=1024, help="Model hidden size")

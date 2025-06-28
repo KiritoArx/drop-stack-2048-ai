@@ -94,3 +94,9 @@ log progress every ``--log-interval`` steps. The ``--init-episodes`` option
 seeds the replay buffer by running a bit of self-play locally before training
 begins. This decouples data generation from the training loop so multiple actors
 can run in parallel.
+
+Both scripts default to using the ``gs://drop-stack-ai-data-12345`` bucket for
+models and episode files. Simply running ``python learner.py`` and
+``python actor.py`` will therefore train and generate data using that bucket.
+You can override the location by setting the ``DROPSTACK_BUCKET`` environment
+variable or passing the ``--model``/``--data``/``--output`` flags explicitly.
