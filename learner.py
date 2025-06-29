@@ -65,15 +65,25 @@ def list_files(path: str) -> list[str]:
 
 
 def make_fused_update(update_fn, n_steps: int):
-    @jax.jit
-    def fused(state, loader):
-        def body(s, _):
-            batch = next(loader)
-            s, _ = update_fn(s, batch)
-            return s, None
+    """Wrap ``update_fn`` to perform multiple steps per call.
 
-        state, _ = jax.lax.scan(body, state, None, length=n_steps)
-        return state
+    The loader itself is passed to the returned function so it can pull
+    consecutive batches without returning to Python between steps. Metrics are
+    accumulated and averaged over ``n_steps``.
+    """
+
+    def fused(state, loader):
+        metrics_sum = None
+        for _ in range(n_steps):
+            batch = next(loader)
+            state, metrics = update_fn(state, batch)
+            if metrics_sum is None:
+                metrics_sum = metrics
+            else:
+                metrics_sum = jax.tree_util.tree_map(lambda a, b: a + b, metrics_sum, metrics)
+
+        metrics_mean = jax.tree_util.tree_map(lambda x: x / n_steps, metrics_sum)
+        return state, metrics_mean
 
     return fused
 
@@ -210,9 +220,8 @@ def main() -> None:
                 time.sleep(0.1)
                 continue
 
-            batch = next(loader)
-            state, metrics = update_fn(state, batch)
-            step += 1
+            state, metrics = update_fn(state, loader)
+            step += fused_steps
 
             if step % args.log_interval == 0:
                 metrics = jax.tree_util.tree_map(lambda x: float(jnp.mean(x)), metrics)
