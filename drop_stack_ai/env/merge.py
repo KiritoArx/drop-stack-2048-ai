@@ -13,10 +13,6 @@ except Exception:  # pragma: no cover - optional dependency
     _cpp_drop_resolve_and_score = None
 
 USING_CPP = _cpp_drop_resolve_and_score is not None
-if USING_CPP:
-    print("[merge] Using C++ merge implementation")
-else:
-    print("[merge] Using Python merge implementation")
 
 
 Board = List[List[int]]
