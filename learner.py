@@ -10,7 +10,7 @@ os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.90")
 os.environ.setdefault(
     "XLA_FLAGS",
     "--xla_gpu_autotune_level=2 "
-    "--xla_cpu_multi_thread_eigen=false,intra_op_parallelism_threads=16",
+    "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=16",
 )
 from typing import Set
 from concurrent.futures import ThreadPoolExecutor
