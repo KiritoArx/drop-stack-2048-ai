@@ -98,6 +98,7 @@ def main() -> None:
     dtype = jnp.float16 if args.mixed_precision else jnp.float32
     model, params = create_model(rng, hidden_size=args.hidden_size, dtype=dtype)
     params = load_model(args.model, model, params)
+    print(f"[actor] starting self-play with model {args.model}")
     last_stamp = None
     batch_buffer = ReplayBuffer()
 
@@ -123,7 +124,7 @@ def main() -> None:
             if stamp != last_stamp:
                 last_stamp = stamp
                 params = load_model(args.model, model, params)
-                print("[actor] loaded new model")
+                print("[actor] loaded new model - starting on new model now")
 
         buffer = ReplayBuffer()
         rng = self_play_parallel(
@@ -135,6 +136,7 @@ def main() -> None:
             processes=args.processes or os.cpu_count(),
             greedy_after=args.greedy_after,
         )
+        print(f"[actor] completed {len(buffer.episodes)} episodes")
         batch_buffer.extend(buffer)
         if len(batch_buffer.episodes) >= args.episodes_per_file:
             payload = pickle.dumps(batch_buffer)

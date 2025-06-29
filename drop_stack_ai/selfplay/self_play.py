@@ -81,9 +81,11 @@ def self_play(
     greedy_after: int | None = None,
     simulations: int = 20,
     c_puct: float = 1.0,
+    verbose: bool = False,
 ) -> jax.random.PRNGKey:
     """Run a single self-play episode using MCTS and store it in ``buffer``."""
-    print("[self_play] starting episode")
+    if verbose:
+        print("[self_play] starting episode")
     rng, states, policies, values, score = _play_episode(
         model,
         params,
@@ -95,11 +97,12 @@ def self_play(
         c_puct=c_puct,
     )
     buffer.add_episode(states, policies, values)
-    print(f"[self_play] finished episode with score={score}")
+    if verbose:
+        print(f"[self_play] finished episode with score={score}")
     return rng
 
 
-def _worker(args: Tuple[int, bytes, int, str, bool, int | None, int, float, bool]):
+def _worker(args: Tuple[int, bytes, int, str, bool, int | None, int, float, bool, bool]):
     """Helper for ``self_play_parallel`` running in a separate process."""
     (
         seed,
@@ -111,8 +114,10 @@ def _worker(args: Tuple[int, bytes, int, str, bool, int | None, int, float, bool
         simulations,
         c_puct,
         use_gpu,
+        verbose,
     ) = args
-    print(f"[worker] pid={os.getpid()} seed={seed} starting")
+    if verbose:
+        print(f"[worker] pid={os.getpid()} seed={seed} starting")
     rng = jax.random.PRNGKey(seed)
     dtype = getattr(jnp, dtype_name)
     model, params = create_model(rng, hidden_size=hidden_size, dtype=dtype)
@@ -127,7 +132,8 @@ def _worker(args: Tuple[int, bytes, int, str, bool, int | None, int, float, bool
         simulations=simulations,
         c_puct=c_puct,
     )
-    print(f"[worker] pid={os.getpid()} seed={seed} finished score={score}")
+    if verbose:
+        print(f"[worker] pid={os.getpid()} seed={seed} finished score={score}")
     return states, policies, values
 
 
@@ -144,9 +150,11 @@ def self_play_parallel(
     greedy_after: int | None = None,
     simulations: int = 20,
     c_puct: float = 1.0,
+    verbose: bool = False,
 ) -> jax.random.PRNGKey:
     """Run ``episodes`` self-play games in parallel."""
-    print(f"[self_play_parallel] episodes={episodes} processes={processes}")
+    if verbose:
+        print(f"[self_play_parallel] episodes={episodes} processes={processes}")
     params_bytes = to_bytes(params)
     keys = jax.random.split(rng, episodes + 1)
     rng = keys[0]
@@ -164,6 +172,7 @@ def self_play_parallel(
             simulations,
             c_puct,
             use_gpu,
+            verbose,
         )
         for seed in seeds
     ]
@@ -175,7 +184,8 @@ def self_play_parallel(
         prev_jax_platform = os.environ.get("JAX_PLATFORM_NAME")
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
         os.environ["JAX_PLATFORM_NAME"] = "cpu"
-        print("[self_play_parallel] running workers on CPU")
+        if verbose:
+            print("[self_play_parallel] running workers on CPU")
     try:
         with ctx.Pool(processes) as pool:
             results = pool.map(_worker, args)
@@ -208,6 +218,7 @@ def launch_self_play_workers(
     greedy_after: int | None = None,
     simulations: int = 20,
     c_puct: float = 1.0,
+    verbose: bool = False,
 ) -> threading.Event:
     """Start background self-play workers that continuously fill ``buffer``."""
 
@@ -228,6 +239,7 @@ def launch_self_play_workers(
                 greedy_after=greedy_after,
                 simulations=simulations,
                 c_puct=c_puct,
+                verbose=verbose,
             )
 
     thread = threading.Thread(target=_loop, daemon=True)
@@ -247,6 +259,7 @@ def launch_self_play_workers_dynamic(
     greedy_after: int | None = None,
     simulations: int = 20,
     c_puct: float = 1.0,
+    verbose: bool = False,
 ) -> threading.Event:
     """Start background workers that fetch params each round."""
 
@@ -268,6 +281,7 @@ def launch_self_play_workers_dynamic(
                     greedy_after=greedy_after,
                     simulations=simulations,
                     c_puct=c_puct,
+                    verbose=verbose,
                 )
 
     thread = threading.Thread(target=_loop, daemon=True)
