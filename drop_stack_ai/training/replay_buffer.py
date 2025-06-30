@@ -42,11 +42,14 @@ class ReplayBuffer:
 
     def sample(self, batch_size: int) -> List[Dict[str, Any]]:
         """Randomly sample ``batch_size`` elements from the buffer."""
-        import random
+        import numpy as np
 
-        if len(self.data) >= batch_size:
-            return random.sample(self.data, batch_size)
-        return random.choices(self.data, k=batch_size)
+        n = len(self.data)
+        if n == 0:
+            return []
+        replace = n < batch_size
+        idx = np.random.choice(n, size=batch_size, replace=replace)
+        return [self.data[i] for i in idx]
 
     def extend(self, other: "ReplayBuffer") -> None:
         """Append all episodes from ``other`` into this buffer."""

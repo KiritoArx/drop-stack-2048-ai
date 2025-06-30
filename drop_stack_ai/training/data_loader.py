@@ -18,28 +18,39 @@ def _prepare_batch(samples: list[Dict[str, Any]]) -> Dict[str, jnp.ndarray]:
     boards = []
     currents = []
     nexts = []
-    policies = []
     values = []
     for item in samples:
         b, c, n = state_to_arrays(item["state"])
         boards.append(b)
         currents.append(c)
         nexts.append(n)
-        policy = jnp.array(item["policy"], dtype=jnp.float32)
-        if policy.ndim == 1 and policy.sum() != 0:
-            policy = policy / policy.sum()
-        policies.append(policy)
         values.append(jnp.array(item["value"], dtype=jnp.float32))
+
+    boards = jnp.stack(boards)
+    currents = jnp.stack(currents)
+    nexts = jnp.stack(nexts)
+
+    policies = jnp.stack(
+        [jnp.array(item["policy"], dtype=jnp.float32) for item in samples]
+    )
+    policy_sums = policies.sum(axis=1, keepdims=True)
+    policy_sums = jnp.where(policy_sums == 0, 1, policy_sums)
+    policies = policies / policy_sums
+
+    values = jnp.stack(values)
+
     return {
-        "board": jnp.stack(boards),
-        "current": jnp.stack(currents),
-        "next": jnp.stack(nexts),
-        "policy": jnp.stack(policies),
-        "value": jnp.stack(values),
+        "board": boards,
+        "current": currents,
+        "next": nexts,
+        "policy": policies,
+        "value": values,
     }
 
 
-def _prefetch_generator(gen: Iterator[Dict[str, jnp.ndarray]], size: int) -> Iterator[Dict[str, jnp.ndarray]]:
+def _prefetch_generator(
+    gen: Iterator[Dict[str, jnp.ndarray]], size: int
+) -> Iterator[Dict[str, jnp.ndarray]]:
     queue: Queue = Queue(maxsize=size)
     stop = object()
 
