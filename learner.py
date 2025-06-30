@@ -5,7 +5,7 @@ import time
 import threading
 
 os.environ.setdefault("JAX_PLATFORM_NAME", "gpu")
-os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "true")
 os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.90")
 os.environ.setdefault(
     "XLA_FLAGS",
