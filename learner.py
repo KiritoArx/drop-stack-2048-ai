@@ -81,7 +81,9 @@ def make_fused_update(update_fn, n_steps: int):
             if metrics_sum is None:
                 metrics_sum = metrics
             else:
-                metrics_sum = jax.tree_util.tree_map(lambda a, b: a + b, metrics_sum, metrics)
+                metrics_sum = jax.tree_util.tree_map(
+                    lambda a, b: a + b, metrics_sum, metrics
+                )
 
         metrics_mean = jax.tree_util.tree_map(lambda x: x / n_steps, metrics_sum)
         return state, metrics_mean
@@ -111,18 +113,33 @@ def main() -> None:
     )
     parser.add_argument("--hidden-size", type=int, default=1024)
     parser.add_argument("--mixed-precision", action="store_true")
-    parser.add_argument("--batch-size", type=int, default=2048,
-                        help="Maximizes GPU usage.")
-    parser.add_argument("--learning-rate", type=float, default=1e-3,
-                        help="More stable for large batches.")
-    parser.add_argument("--buffer-size", type=int, default=500_000,
-                        help="Keeps richer replay data available.")
-    parser.add_argument("--save-every", type=int, default=1000,
-                        help="Checkpoint every 1000 steps.")
-    parser.add_argument("--steps", type=int, default=10000,
-                        help="Fewer interruptions, longer training cycles.")
-    parser.add_argument("--scan-every", type=int, default=10,
-                        help="Frequent scanning for new episodes.")
+    parser.add_argument(
+        "--batch-size", type=int, default=2048, help="Maximizes GPU usage."
+    )
+    parser.add_argument(
+        "--learning-rate",
+        type=float,
+        default=1e-3,
+        help="More stable for large batches.",
+    )
+    parser.add_argument(
+        "--buffer-size",
+        type=int,
+        default=500_000,
+        help="Keeps richer replay data available.",
+    )
+    parser.add_argument(
+        "--save-every", type=int, default=1000, help="Checkpoint every 1000 steps."
+    )
+    parser.add_argument(
+        "--steps",
+        type=int,
+        default=10000,
+        help="Fewer interruptions, longer training cycles.",
+    )
+    parser.add_argument(
+        "--scan-every", type=int, default=10, help="Frequent scanning for new episodes."
+    )
     parser.add_argument(
         "--max-scan-interval",
         type=int,
@@ -132,14 +149,27 @@ def main() -> None:
     parser.add_argument(
         "--download-workers",
         type=int,
-        default=8,
+        default=16,
         help="Parallel downloads for episodes.",
     )
-    parser.add_argument("--log-interval", type=int, default=200,
-                        help="Reduce logging overhead.")
-    parser.add_argument("--init-episodes", type=int, default=0, help="Generate this many episodes locally if buffer is empty")
-    parser.add_argument("--processes", type=int, default=1, help="Processes for seeding episodes")
-    parser.add_argument("--greedy-after", type=int, default=10, help="Steps before greedy play during seeding")
+    parser.add_argument(
+        "--log-interval", type=int, default=200, help="Reduce logging overhead."
+    )
+    parser.add_argument(
+        "--init-episodes",
+        type=int,
+        default=0,
+        help="Generate this many episodes locally if buffer is empty",
+    )
+    parser.add_argument(
+        "--processes", type=int, default=1, help="Processes for seeding episodes"
+    )
+    parser.add_argument(
+        "--greedy-after",
+        type=int,
+        default=10,
+        help="Steps before greedy play during seeding",
+    )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
