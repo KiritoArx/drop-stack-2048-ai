@@ -104,6 +104,15 @@ def main() -> None:
     score_accum: list[float] = []
     step_accum: list[int] = []
 
+    gcs_bucket = None
+    gcs_prefix = ""
+    if args.output.startswith("gs://"):
+        from google.cloud import storage
+
+        bucket_name, gcs_prefix = args.output[5:].split("/", 1)
+        gcs_client = storage.Client()
+        gcs_bucket = gcs_client.bucket(bucket_name)
+
     last_check = 0.0
     while True:
         now = time.time()
@@ -146,13 +155,20 @@ def main() -> None:
         if len(batch_buffer.episodes) >= args.episodes_per_file:
             payload = pickle.dumps(batch_buffer)
             filename = f"episodes_{int(time.time())}.pkl"
-            out_path = os.path.join(args.output, filename)
+            if gcs_bucket:
+                blob_name = os.path.join(gcs_prefix, filename)
+                out_path = f"gs://{gcs_bucket.name}/{blob_name}"
+            else:
+                out_path = os.path.join(args.output, filename)
             avg_score = sum(score_accum) / len(score_accum)
             avg_steps = sum(step_accum) / len(step_accum)
             print(
                 f"[actor] uploading {len(batch_buffer.episodes)} episodes | Avg Score: {avg_score:.2f} | Avg Steps: {avg_steps:.2f}"
             )
-            save_bytes(payload, out_path)
+            if gcs_bucket:
+                gcs_bucket.blob(blob_name).upload_from_string(payload)
+            else:
+                save_bytes(payload, out_path)
             print(f"[actor] uploaded to {out_path}")
             batch_buffer = ReplayBuffer()
             score_accum.clear()
