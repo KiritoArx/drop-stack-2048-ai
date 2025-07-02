@@ -21,10 +21,12 @@ def state_to_arrays(
         Optional JAX device to place the resulting arrays on. When ``None`` the
         current default device is used.
     """
-    board = jnp.zeros((5, 6), dtype=jnp.float32)
-    for c, col in enumerate(state["board"]):
-        if col:
-            board = board.at[c, : len(col)].set(jnp.array(col, dtype=jnp.float32))
+    # Pad each column to the fixed ``MAX_HEIGHT`` and build the board in one go.
+    board_list = [
+        col + [0] * (6 - len(col)) if len(col) < 6 else col
+        for col in state["board"]
+    ]
+    board = jnp.array(board_list, dtype=jnp.float32)
     current = jnp.array(state["current_tile"], dtype=jnp.float32)
     next_tile = jnp.array(state["next_tile"], dtype=jnp.float32)
     # Ensure arrays reside on the desired device for jitted functions
