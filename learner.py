@@ -223,21 +223,32 @@ def main() -> None:
     episode_q: Queue = Queue(maxsize=16)
 
     def _scan() -> None:
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Scan thread started.")
         with ThreadPoolExecutor(max_workers=args.download_workers) as executor:
             while not stop_event.is_set():
-                paths = [p for p in list_files(args.data) if p not in processed]
-                if paths:
-                    futures = {executor.submit(load_bytes, p): p for p in paths}
-                    for fut in futures:
-                        path = futures[fut]
-                        try:
-                            data = fut.result()
-                            new_buf = load_buffer_bytes(data)
-                            episode_q.put(new_buf)
-                            processed.add(path)
-                        except Exception as e:
-                            print(f"[learner] failed to load {path}: {e}")
-                time.sleep(args.scan_every)
+                print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Starting a new scan cycle...")
+                try:
+                    paths = [p for p in list_files(args.data) if p not in processed]
+                    print(f"[{time.strftime('%H:%M:%S')}] DEBUG: list_files completed. Found {len(paths)} new paths.")
+
+                    if paths:
+                        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Submitting {len(paths)} new files for download.")
+                        futures = {executor.submit(load_bytes, p): p for p in paths}
+                        for fut in futures:
+                            path = futures[fut]
+                            try:
+                                data = fut.result()
+                                new_buf = load_buffer_bytes(data)
+                                episode_q.put(new_buf)
+                                processed.add(path)
+                                print(f"[{time.strftime('%H:%M:%S')}] \u2705 DEBUG: Successfully loaded and queued {path}")
+                            except Exception as e:
+                                print(f"[{time.strftime('%H:%M:%S')}] \u274C ERROR: Failed to load {path}: {e}")
+
+                    time.sleep(args.scan_every)
+
+                except Exception as e:
+                    print(f"[{time.strftime('%H:%M:%S')}] \u274C ERROR: An unexpected error occurred in the scan loop: {e}")
 
     threading.Thread(target=_scan, daemon=True).start()
 
