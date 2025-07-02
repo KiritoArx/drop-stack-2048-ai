@@ -47,7 +47,7 @@ def main() -> None:
     parser.add_argument(
         "--episodes",
         type=int,
-        default=5000,
+        default=50,
         help="Episodes per self-play batch",
     )
     parser.add_argument(
