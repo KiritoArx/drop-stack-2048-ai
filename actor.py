@@ -53,7 +53,7 @@ def main() -> None:
     parser.add_argument(
         "--episodes-per-file",
         type=int,
-        default=20000,
+        default=50,
         help="Number of episodes per uploaded file",
     )
     parser.add_argument(
