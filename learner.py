@@ -138,7 +138,7 @@ def main() -> None:
         help="Fewer interruptions, longer training cycles.",
     )
     parser.add_argument(
-        "--scan-every", type=int, default=10, help="Frequent scanning for new episodes."
+        "--scan-every", type=int, default=5, help="Frequent scanning for new episodes."
     )
     parser.add_argument(
         "--max-scan-interval",
@@ -149,7 +149,7 @@ def main() -> None:
     parser.add_argument(
         "--download-workers",
         type=int,
-        default=16,
+        default=8,
         help="Parallel downloads for episodes.",
     )
     parser.add_argument(
