@@ -101,6 +101,8 @@ def main() -> None:
     print(f"[actor] starting self-play with model {args.model}")
     last_stamp = None
     batch_buffer = ReplayBuffer()
+    score_accum: list[float] = []
+    step_accum: list[int] = []
 
     last_check = 0.0
     while True:
@@ -127,7 +129,7 @@ def main() -> None:
                 print("[actor] loaded new model - starting on new model now")
 
         buffer = ReplayBuffer()
-        rng = self_play_parallel(
+        rng, scores, steps = self_play_parallel(
             model,
             params,
             rng,
@@ -135,18 +137,26 @@ def main() -> None:
             episodes=args.episodes,
             processes=args.processes or os.cpu_count(),
             greedy_after=args.greedy_after,
+            return_info=True,
         )
         print(f"[actor] completed {len(buffer.episodes)} episodes")
+        score_accum.extend(scores)
+        step_accum.extend(steps)
         batch_buffer.extend(buffer)
         if len(batch_buffer.episodes) >= args.episodes_per_file:
             payload = pickle.dumps(batch_buffer)
             filename = f"episodes_{int(time.time())}.pkl"
             out_path = os.path.join(args.output, filename)
-            save_bytes(payload, out_path)
+            avg_score = sum(score_accum) / len(score_accum)
+            avg_steps = sum(step_accum) / len(step_accum)
             print(
-                f"[actor] uploaded {len(batch_buffer.episodes)} episodes to {out_path}"
+                f"[actor] uploading {len(batch_buffer.episodes)} episodes | Avg Score: {avg_score:.2f} | Avg Steps: {avg_steps:.2f}"
             )
+            save_bytes(payload, out_path)
+            print(f"[actor] uploaded to {out_path}")
             batch_buffer = ReplayBuffer()
+            score_accum.clear()
+            step_accum.clear()
         if args.sleep:
             time.sleep(args.sleep)
 

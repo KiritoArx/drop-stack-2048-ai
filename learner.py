@@ -257,7 +257,7 @@ def main() -> None:
             if step % args.log_interval == 0:
                 metrics = jax.tree_util.tree_map(lambda x: float(jnp.mean(x)), metrics)
                 print(
-                    f"step {step}: loss={metrics['loss']:.4f} "
+                    f"[learner] step {step}/{args.steps} | loss: {metrics['loss']:.4f} "
                     f"policy_loss={metrics['policy_loss']:.4f} value_loss={metrics['value_loss']:.4f}"
                 )
 

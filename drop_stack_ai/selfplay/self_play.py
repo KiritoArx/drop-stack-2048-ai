@@ -134,7 +134,7 @@ def _worker(args: Tuple[int, bytes, int, str, bool, int | None, int, float, bool
     )
     if verbose:
         print(f"[worker] pid={os.getpid()} seed={seed} finished score={score}")
-    return states, policies, values
+    return states, policies, values, score, len(states)
 
 
 def self_play_parallel(
@@ -151,8 +151,12 @@ def self_play_parallel(
     simulations: int = 20,
     c_puct: float = 1.0,
     verbose: bool = False,
-) -> jax.random.PRNGKey:
-    """Run ``episodes`` self-play games in parallel."""
+    return_info: bool = False,
+) -> jax.random.PRNGKey | tuple[jax.random.PRNGKey, list[float], list[int]]:
+    """Run ``episodes`` self-play games in parallel.
+
+    When ``return_info`` is ``True`` the function also returns lists of the
+    final score and episode length for each generated game."""
     if verbose:
         print(f"[self_play_parallel] episodes={episodes} processes={processes}")
     params_bytes = to_bytes(params)
@@ -200,9 +204,16 @@ def self_play_parallel(
             else:
                 os.environ["JAX_PLATFORM_NAME"] = prev_jax_platform
 
-    for states, policies, values in results:
+    scores: list[float] = []
+    lengths: list[int] = []
+    for states, policies, values, score, length in results:
         buffer.add_episode(states, policies, values)
+        if return_info:
+            scores.append(float(score))
+            lengths.append(int(length))
 
+    if return_info:
+        return rng, scores, lengths
     return rng
 
 
