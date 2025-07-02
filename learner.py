@@ -232,12 +232,10 @@ def main() -> None:
     stop_event = threading.Event()
     episode_q: Queue = Queue(maxsize=16)
 
-    def _scan() -> None:
+    def _scan(client: storage.Client | None) -> None:
         with ThreadPoolExecutor(max_workers=args.download_workers) as executor:
             while not stop_event.is_set():
-                paths = [
-                    p for p in list_files(args.data, gcs_client) if p not in processed
-                ]
+                paths = [p for p in list_files(args.data, client) if p not in processed]
                 if paths:
                     futures = {executor.submit(load_bytes, p): p for p in paths}
                     for fut in futures:
@@ -251,7 +249,7 @@ def main() -> None:
                             print(f"[learner] failed to load {path}: {e}")
                 time.sleep(args.scan_every)
 
-    threading.Thread(target=_scan, daemon=True).start()
+    threading.Thread(target=_scan, args=(gcs_client,), daemon=True).start()
 
     step = 0
     try:
