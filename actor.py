@@ -65,7 +65,7 @@ def main() -> None:
     parser.add_argument(
         "--hidden-size",
         type=int,
-        default=1024,
+        default=512,
         help="Model hidden size (match learner)",
     )
     parser.add_argument(

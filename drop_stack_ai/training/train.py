@@ -56,7 +56,7 @@ class TrainConfig:
     batch_size: int = 512
     steps: int = 100_000
     learning_rate: float = 2e-3
-    hidden_size: int = 1024
+    hidden_size: int = 512
     log_interval: int = 10
     checkpoint_path: Optional[str] = None
     workers: int = 0
@@ -261,7 +261,7 @@ if __name__ == "__main__":
         "--learning-rate", type=float, default=2e-3, help="Learning rate"
     )
     parser.add_argument(
-        "--hidden-size", type=int, default=1024, help="Model hidden size"
+        "--hidden-size", type=int, default=512, help="Model hidden size"
     )
     parser.add_argument(
         "--mixed-precision",

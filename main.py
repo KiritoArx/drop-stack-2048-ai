@@ -96,7 +96,7 @@ def main() -> None:
     parser.add_argument("--steps", type=int, default=100000, help="Training steps")
     parser.add_argument("--batch-size", type=int, default=512, help="Batch size")
     parser.add_argument("--learning-rate", type=float, default=2e-3, help="Learning rate")
-    parser.add_argument("--hidden-size", type=int, default=1024, help="Model hidden size")
+    parser.add_argument("--hidden-size", type=int, default=512, help="Model hidden size")
     parser.add_argument(
         "--mixed-precision",
         action="store_true",
