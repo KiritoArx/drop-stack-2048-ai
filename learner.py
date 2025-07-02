@@ -53,10 +53,18 @@ def load_buffer_bytes(data: bytes) -> ReplayBuffer:
     raise TypeError("Unrecognized buffer format")
 
 
-def list_files(path: str) -> list[str]:
+def list_files(path: str, client: storage.Client | None = None) -> list[str]:
+    """Return a list of file paths contained in ``path``.
+
+    If ``path`` is a ``gs://`` URI, ``client`` is used for the storage
+    operations. When ``client`` is ``None`` a new ``storage.Client`` will be
+    created on demand. Local paths simply list directory contents.
+    """
+
     if path.startswith("gs://"):
         bucket, prefix = path[5:].split("/", 1)
-        client = storage.Client()
+        if client is None:
+            client = storage.Client()
         return [
             f"gs://{bucket}/{blob.name}"
             for blob in client.list_blobs(bucket, prefix=prefix)
@@ -219,13 +227,17 @@ def main() -> None:
     last_save = time.time()
     loader = data_loader(buffer, args.batch_size, devices=devices, prefetch=2)
 
+    gcs_client = storage.Client() if args.data.startswith("gs://") else None
+
     stop_event = threading.Event()
     episode_q: Queue = Queue(maxsize=16)
 
     def _scan() -> None:
         with ThreadPoolExecutor(max_workers=args.download_workers) as executor:
             while not stop_event.is_set():
-                paths = [p for p in list_files(args.data) if p not in processed]
+                paths = [
+                    p for p in list_files(args.data, gcs_client) if p not in processed
+                ]
                 if paths:
                     futures = {executor.submit(load_bytes, p): p for p in paths}
                     for fut in futures:
