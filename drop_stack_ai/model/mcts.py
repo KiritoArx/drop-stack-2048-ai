@@ -95,10 +95,19 @@ def run_mcts(
             )
             logits, value_pred = predict(params, board, current, next_tile)
             logits, value_pred = jax.device_get((logits, value_pred))
-            policy = jax.nn.softmax(logits)
+
+            # Mask moves that would exceed MAX_HEIGHT to keep array shapes
+            legal_mask = jnp.array(
+                [len(sim_env.board[c]) < sim_env.MAX_HEIGHT for c in range(sim_env.COLUMN_COUNT)],
+                dtype=jnp.bool_,
+            )
+            masked_logits = jnp.where(legal_mask, logits, -jnp.inf)
+            policy = jax.nn.softmax(masked_logits)
+
             if not node.children:
                 for a in range(5):
-                    node.children[a] = Node(float(policy[a]))
+                    if legal_mask[a]:
+                        node.children[a] = Node(float(policy[a]))
             value = float(value_pred)
 
         # Backup
