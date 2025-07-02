@@ -111,10 +111,10 @@ def main() -> None:
         default=DEFAULT_LATEST,
         help="gs:// path for the continuously updated model",
     )
-    parser.add_argument("--hidden-size", type=int, default=1024)
+    parser.add_argument("--hidden-size", type=int, default=512)
     parser.add_argument("--mixed-precision", action="store_true")
     parser.add_argument(
-        "--batch-size", type=int, default=2048, help="Maximizes GPU usage."
+        "--batch-size", type=int, default=1024, help="Maximizes GPU usage."
     )
     parser.add_argument(
         "--learning-rate",
@@ -153,7 +153,7 @@ def main() -> None:
         help="Parallel downloads for episodes.",
     )
     parser.add_argument(
-        "--log-interval", type=int, default=200, help="Reduce logging overhead."
+        "--log-interval", type=int, default=8, help="Reduce logging overhead."
     )
     parser.add_argument(
         "--init-episodes",
